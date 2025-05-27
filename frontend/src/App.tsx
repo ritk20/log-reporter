@@ -4,7 +4,7 @@ import { Layout } from './components/public/Layout';
 import { RoleBasedRoute } from './components/auth/RoleBasedRoute';
 import { PrivateRoute } from './components/auth/PrivateRoute';
 import Login from './pages/Auth/Login';
-import Upload from './pages/Admin/Upload';
+import Upload from './pages/Admin/upload';
 // import Dashboard from './pages/Admin/Dashboard';
 // import AnalyticsDashboard from './pages/Analytics/AnalyticsDashboard';
 

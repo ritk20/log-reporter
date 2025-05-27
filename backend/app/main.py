@@ -4,6 +4,7 @@ from app.api.auth import router as auth_router
 from app.api.upload import router as upload_router
 from app.core.config import settings 
 import logging
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
