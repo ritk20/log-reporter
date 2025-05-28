@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile,HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
@@ -39,6 +39,9 @@ def validate_filename(filename: str):
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
+    if not file.filename.endswith(".zip"):
+        raise HTTPException(400,"File must be a ZIP archive")
+    
     logger.info(f"Received file: {file.filename}")
     
     valid, error_message = validate_filename(file.filename)
