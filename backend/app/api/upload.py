@@ -108,3 +108,25 @@ async def upload_file(file: UploadFile = File(...)):
             content={"error": f"Failed to process ZIP file: {str(e)}"},
             status_code=500
         )
+    
+    #TODO: Validate filename and save file to UPLOAD_DIR
+    # logger.info(f"Received file: {file.filename}")
+    
+    # valid, error_message = validate_filename(file.filename)
+    # if not valid:
+    #     logger.warning(f"Validation failed: {error_message}")
+    #     return JSONResponse(status_code=400, content={"detail": error_message})
+    
+    # try:
+    #     file_location = os.path.join(UPLOAD_DIR, file.filename)
+    #     with open(file_location, "wb") as f:
+    #         content = await file.read()
+    #         f.write(content)
+    #     logger.info(f"File saved to {file_location}")
+    #     return JSONResponse(content={"detail": f"File '{file.filename}' uploaded successfully!"})
+    # except Exception as e:
+    #     logger.error(f"Error uploading file: {str(e)}")
+    #     return JSONResponse(
+    #         status_code=500,
+    #         content={"detail": "Internal server error during upload"}
+    #     )
