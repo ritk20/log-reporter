@@ -90,9 +90,29 @@ async def upload_file(file: UploadFile = File(...)):
             
             df = combine_logs(all_parsed_logs)
 
-            # Convert DataFrame to JSON with ISO date format
+            # Generate output filename based on input filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            base_filename = Path(file.filename).stem
+            output_filename = f"{base_filename}_{timestamp}.json"
+            output_path = os.path.join(UPLOAD_DIR, output_filename)
+
+            # Save to JSON file
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(
+                    json.loads(df.to_json(orient="records", date_format="iso")),
+                    f,
+                    indent=2
+                )
+            
+            logger.info(f"Processed logs saved to: {output_path}")
+
+            # Return response with file location
             return JSONResponse(
-                content=json.loads(df.to_json(orient="records", date_format="iso")),
+                content={
+                    "message": "File processed successfully",
+                    "output_file": output_filename,
+                    "data": json.loads(df.to_json(orient="records", date_format="iso"))
+                },
                 status_code=200
             )
 
