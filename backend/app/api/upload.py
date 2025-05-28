@@ -90,9 +90,29 @@ async def upload_file(file: UploadFile = File(...)):
             
             df = combine_logs(all_parsed_logs)
 
-            # Convert DataFrame to JSON with ISO date format
+            # Generate output filename based on input filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            base_filename = Path(file.filename).stem
+            output_filename = f"{base_filename}_{timestamp}.json"
+            output_path = os.path.join(UPLOAD_DIR, output_filename)
+
+            # Save to JSON file
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(
+                    json.loads(df.to_json(orient="records", date_format="iso")),
+                    f,
+                    indent=2
+                )
+            
+            logger.info(f"Processed logs saved to: {output_path}")
+
+            # Return response with file location
             return JSONResponse(
-                content=json.loads(df.to_json(orient="records", date_format="iso")),
+                content={
+                    "message": "File processed successfully",
+                    "output_file": output_filename,
+                    "data": json.loads(df.to_json(orient="records", date_format="iso"))
+                },
                 status_code=200
             )
 
@@ -108,3 +128,25 @@ async def upload_file(file: UploadFile = File(...)):
             content={"error": f"Failed to process ZIP file: {str(e)}"},
             status_code=500
         )
+    
+    #TODO: Validate filename and save file to UPLOAD_DIR
+    # logger.info(f"Received file: {file.filename}")
+    
+    # valid, error_message = validate_filename(file.filename)
+    # if not valid:
+    #     logger.warning(f"Validation failed: {error_message}")
+    #     return JSONResponse(status_code=400, content={"detail": error_message})
+    
+    # try:
+    #     file_location = os.path.join(UPLOAD_DIR, file.filename)
+    #     with open(file_location, "wb") as f:
+    #         content = await file.read()
+    #         f.write(content)
+    #     logger.info(f"File saved to {file_location}")
+    #     return JSONResponse(content={"detail": f"File '{file.filename}' uploaded successfully!"})
+    # except Exception as e:
+    #     logger.error(f"Error uploading file: {str(e)}")
+    #     return JSONResponse(
+    #         status_code=500,
+    #         content={"detail": "Internal server error during upload"}
+    #     )

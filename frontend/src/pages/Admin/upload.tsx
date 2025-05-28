@@ -36,7 +36,7 @@ export default function Upload() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+    <div className="flex flex-col items-center justify-center min-h-full">
       <div className="p-2">
         <h1 className="text-3xl font-bold text-center text-gray-800">
           Logs Uploader
@@ -56,17 +56,8 @@ export default function Upload() {
               return;
             }
             const file = e.target.files[0];
-            if (file.type === 'application/zip' ||
-            file.type === 'application/x-tar' ||
-            file.type === 'application/gzip' ||
-            file.type === 'text/plain' ||
-            file.type === 'application/x-zip-compressed') {
               setFile(file);
               setMessage('');
-            } else {
-              setMessage('Please select a ZIP file');
-              setFile(null);
-            }
           }}
         />
       </div>

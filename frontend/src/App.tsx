@@ -6,7 +6,7 @@ import { PrivateRoute } from './components/auth/PrivateRoute';
 import Login from './pages/Auth/Login';
 import Upload from './pages/Admin/upload';
 // import Dashboard from './pages/Admin/Dashboard';
-// import AnalyticsDashboard from './pages/Analytics/AnalyticsDashboard';
+import AnalyticsDashboard from './pages/Public/analytics';
 
 function App() {
   return (
@@ -25,7 +25,7 @@ function App() {
             
             {/* Analytics - Available to all authenticated users */}
             <Route element={<PrivateRoute />}>
-              {/* <Route path="/analytics" element={<AnalyticsDashboard />} /> */}
+              <Route path="/analytics" element={<AnalyticsDashboard />} />
             </Route>
             
             <Route path="/unauthorized" element={<div>Access Denied</div>} />
