@@ -42,8 +42,33 @@ async def upload_file(file: UploadFile = File(...)):
         parsed_logs = parser_log_file_from_content(content)  # No need for log_parser module if in same file
         df = combine_logs(parsed_logs)
 
-        # Convert DataFrame to JSON with ISO date format
-        return JSONResponse(content=json.loads(df.to_json(orient="records", date_format="iso")), status_code=200)
+        # Create a JSON response
+        json_response = df.to_json(orient="records", date_format="iso")
+        
+        # Create output directory if it doesn't exist
+        output_dir = os.path.join(UPLOAD_DIR, 'processed')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Generate output filename based on input filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"processed_{timestamp}.json"
+        output_path = os.path.join(output_dir, output_filename)
+        
+        # Save JSON to file
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(json.loads(json_response), f, indent=2)
+            
+        logger.info(f"Processed data saved to: {output_path}")
+
+        # Return response to client
+        return JSONResponse(
+            content={
+                "message": "File processed successfully",
+                "output_file": output_filename,
+                "data": json.loads(json_response)
+            }, 
+            status_code=200
+        )
 
     except UnicodeDecodeError as ude:
         logger.exception("File is not a valid UTF-8 text file")
