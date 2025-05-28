@@ -83,7 +83,7 @@ def extract_token_details(token, is_response):
             "value": token.get("value", ""),
             "currency": token.get("tag", {}).get("currency", ""),
             "creationTimestamp": token.get("tag", {}).get("creationTimestamp", ""),
-            "issuersSignature": token.get("tag", {}).get("issuersSignature", ""),
+            "issuerSignature": token.get("tag", {}).get("issuerSignature", ""),
             "ownerAddress": token.get("tag", {}).get("ownerAddress", "")
         }
     else:
@@ -96,7 +96,7 @@ def extract_token_details(token, is_response):
                 "value": input_item.get("value", ""),
                 "currency": input_item.get("tag", {}).get("currency", ""),
                 "creationTimestamp": input_item.get("tag", {}).get("creationTimestamp", ""),
-                "issuersSignature": input_item.get("tag", {}).get("issuersSignature", ""),
+                "issuerSignature": input_item.get("tag", {}).get("issuerSignature", ""),
                 "ownerAddress": input_item.get("tag", {}).get("ownerAddress", "")
             }
             input_list.append(input_details)
@@ -190,7 +190,7 @@ def combine_logs(logs):
     df = pd.DataFrame(transaction.values())
 
     # Parse timestamps with the correct format
-    """df["Request_timestamp"] = pd.to_datetime(df["Request_timestamp"], utc=True)
+    df["Request_timestamp"] = pd.to_datetime(df["Request_timestamp"], utc=True)
     df["Response_timestamp"] = pd.to_datetime(df["Response_timestamp"], utc=True)
 
     # Log any invalid timestamps for debugging
@@ -205,7 +205,7 @@ def combine_logs(logs):
     df["Time_to_Transaction_secs"] = df["Time_to_Transaction_secs"].fillna(0)  # Handle NaT"""
 
     # Convert success/failure to binary
-    #df["Result_of_Transaction"] = df["Result_of_Transaction"].replace({'SUCCESS': 1, 'FAILURE': 0})
+    df["Result_of_Transaction"] = df["Result_of_Transaction"].replace({'SUCCESS': 1, 'FAILURE': 0})
 
     # Additional computed fields
     df["input_amount"] = df["Req_Tot_Amount"].astype(float)
