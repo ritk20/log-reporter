@@ -2,10 +2,12 @@ import os
 import logging
 from datetime import datetime
 import re
+import uuid
+from app.utils.thread_pool_processing import run_in_thread_pool
 from fastapi import APIRouter, File, UploadFile,HTTPException
 from fastapi.responses import JSONResponse
 from app.core.config import settings
-from app.log_parser import parser_log_file_from_content, combine_logs
+from app.utils.log_parser import parser_log_file_from_content, combine_logs
 import json
 import zipfile
 import tempfile
@@ -38,7 +40,15 @@ def validate_filename(filename: str):
 async def upload_file(file: UploadFile = File(...)):
     if not file.filename.endswith(".zip"):
         raise HTTPException(400, "The file is not in Zip format")
-    
+    # write the file to the disk
+    # spawn the background task to process the file
+    # create the new task Id for the file processing and return it to the user
+    # task_id  = str(uuid.uuid4())
+    # # store the file in heelo_ther
+    # file_path = "hello_ther.zip"
+    # # store the task id and file path in a database or in-memory store if needed [task_id: file_path]
+    # run_in_thread_pool(task_id)
+    # return task_id
     try:
         # Create temporary directory for extraction
         with tempfile.TemporaryDirectory() as temp_dir:
