@@ -38,14 +38,14 @@ def validate_filename(filename: str):
     return True, None
 
 @router.post("/upload", tags=["File Operations"])
-async def upload_file(file: UploadFile = File(...),background_task:BackgroundTasks=None):
+async def upload_file(file: UploadFile = File(...)):
     if not file.filename.endswith(".zip"):
         raise HTTPException(400, "The file is not in Zip format")
     
     # TODO: validate filename pattern and date 
     try:
         task_id = str(uuid.uuid4())
-        upload_file = Path("upload")
+        upload_file = Path(UPLOAD_DIR)
         
         upload_file.mkdir(parents=True, exist_ok=True)
         save_path = upload_file / f"{file.filename}"
