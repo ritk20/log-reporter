@@ -1,5 +1,8 @@
 import os
 from typing import List
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class Settings:
     # Project settings
@@ -9,6 +12,7 @@ class Settings:
     # CORS settings
     ALL_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
+        "http://localhost:3000",
     ]
 
     # Upload directory
@@ -20,5 +24,13 @@ class Settings:
     # Sentry settings
     SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "local")
+
+    # MongoDB settings
+    MONGODB_URL: str = os.getenv("MONGODB_URL")
+    MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "log_reporter")
+    MONGODB_COLLECTION_NAME: str = os.getenv("MONGODB_COLLECTION_NAME", "logs")
+
+    class Config:
+        env_file = ".env"
 
 settings = Settings()

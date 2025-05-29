@@ -2,7 +2,12 @@ import os
 import logging
 from datetime import datetime
 import re
+<<<<<<< HEAD
 from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks
+=======
+from app.utils.log_storage import LogStorageService
+from fastapi import APIRouter, File, UploadFile,HTTPException
+>>>>>>> origin/main
 from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.utils.log_parser import parser_log_file_from_content, combine_logs
@@ -39,10 +44,22 @@ def validate_filename(filename: str):
 async def upload_file(file: UploadFile = File(...), background_task: BackgroundTasks = None):
     if not file.filename.endswith(".zip"):
         raise HTTPException(400, "The file is not in Zip format")
+<<<<<<< HEAD
     
     # Optional: validate filename pattern and date
    
     
+=======
+    # write the file to the disk
+    # spawn the background task to process the file
+    # create the new task Id for the file processing and return it to the user
+    # task_id  = str(uuid.uuid4())
+    # # store the file in heelo_ther
+    # file_path = "hello_ther.zip"
+    # # store the task id and file path in a database or in-memory store if needed [task_id: file_path]
+    # run_in_thread_pool(task_id)
+    # return task_id
+>>>>>>> origin/main
     try:
         task_id = str(uuid.uuid4())
         upload_file = Path("upload")
@@ -58,13 +75,30 @@ async def upload_file(file: UploadFile = File(...), background_task: BackgroundT
 
         task_status[task_id] = "processing"
 
+<<<<<<< HEAD
         # Spawn background task to process the saved ZIP file
         run_in_thread_pool(process_zip_file, task_id, str(save_path))
+=======
+            # Convert DataFrame to list of dictionaries
+            log_records = df.to_dict('records')
+            
+            # Store in MongoDB
+            storage_result = await LogStorageService.store_logs_batch(log_records)
+            
+            logger.info(f"MongoDB storage result: {storage_result}")
+
+            # Generate output filename based on input filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            base_filename = Path(file.filename).stem
+            output_filename = f"{base_filename}_{timestamp}.json"
+            output_path = os.path.join(UPLOAD_DIR, output_filename)
+>>>>>>> origin/main
 
         # Return task_id immediately
         return {"task_id": task_id, "status": "processing"}
 
     except Exception as e:
+<<<<<<< HEAD
         logger.exception("Failed to handle uploaded file")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
@@ -119,3 +153,10 @@ async def save_large_upload(upload_file: UploadFile, save_path: Path) -> int:
             outfile.write(chunk)
             total_size += len(chunk)
     return total_size
+=======
+        logger.exception("Unexpected error during ZIP file processing")
+        return JSONResponse(
+            content={"error": f"Failed to process ZIP file: {str(e)}"},
+            status_code=500
+        )
+>>>>>>> origin/main
