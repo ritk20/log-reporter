@@ -2,12 +2,9 @@ import os
 import logging
 from datetime import datetime
 import re
-<<<<<<< HEAD
 from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks
-=======
 from app.utils.log_storage import LogStorageService
 from fastapi import APIRouter, File, UploadFile,HTTPException
->>>>>>> origin/main
 from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.utils.log_parser import parser_log_file_from_content, combine_logs
@@ -41,30 +38,24 @@ def validate_filename(filename: str):
     return True, None
 
 @router.post("/upload", tags=["File Operations"])
-async def upload_file(file: UploadFile = File(...), background_task: BackgroundTasks = None):
+async def upload_file(file: UploadFile = File(...),background_task:BackgroundTasks=None):
     if not file.filename.endswith(".zip"):
         raise HTTPException(400, "The file is not in Zip format")
-<<<<<<< HEAD
     
-    # Optional: validate filename pattern and date
+    
+    
+    # TODO: validate filename pattern and date
    
     
-=======
-    # write the file to the disk
-    # spawn the background task to process the file
-    # create the new task Id for the file processing and return it to the user
-    # task_id  = str(uuid.uuid4())
-    # # store the file in heelo_ther
-    # file_path = "hello_ther.zip"
-    # # store the task id and file path in a database or in-memory store if needed [task_id: file_path]
-    # run_in_thread_pool(task_id)
-    # return task_id
->>>>>>> origin/main
     try:
         task_id = str(uuid.uuid4())
         upload_file = Path("upload")
+        
         upload_file.mkdir(parents=True, exist_ok=True)
-        save_path = upload_file / f"{task_id}_{file.filename}"
+        save_path = upload_file / f"{file.filename}"
+        existing_files = list(upload_file.glob(f"*_{file.filename}"))
+        if existing_files:
+             return {"error": "File with the same name already exists"}
 
         # Save large upload in chunks and get file size
         file_size = await save_large_upload(file, save_path)
@@ -75,42 +66,29 @@ async def upload_file(file: UploadFile = File(...), background_task: BackgroundT
 
         task_status[task_id] = "processing"
 
-<<<<<<< HEAD
         # Spawn background task to process the saved ZIP file
         run_in_thread_pool(process_zip_file, task_id, str(save_path))
-=======
-            # Convert DataFrame to list of dictionaries
-            log_records = df.to_dict('records')
-            
-            # Store in MongoDB
-            storage_result = await LogStorageService.store_logs_batch(log_records)
-            
-            logger.info(f"MongoDB storage result: {storage_result}")
-
-            # Generate output filename based on input filename
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            base_filename = Path(file.filename).stem
-            output_filename = f"{base_filename}_{timestamp}.json"
-            output_path = os.path.join(UPLOAD_DIR, output_filename)
->>>>>>> origin/main
 
         # Return task_id immediately
         return {"task_id": task_id, "status": "processing"}
 
     except Exception as e:
-<<<<<<< HEAD
         logger.exception("Failed to handle uploaded file")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 def process_zip_file(task_id: str, file_path: str):
     try:
+        logger.info(f"[{task_id}] Starting zip file processing: {file_path}")
         temp_dir = tempfile.mkdtemp()
+        extracted_files = []
+
         with zipfile.ZipFile(file_path, 'r') as zip_ref:
-            extracted_files = []
             for zip_info in zip_ref.infolist():
                 if not zip_info.is_dir():
                     zip_ref.extract(zip_info, temp_dir)
                     extracted_files.append(zip_info.filename)
+
+        logger.info(f"[{task_id}] Extracted files: {extracted_files}")
 
         all_parsed_logs = []
         for extracted_file in extracted_files:
@@ -123,21 +101,32 @@ def process_zip_file(task_id: str, file_path: str):
                     parsed_logs = parser_log_file_from_content(content)
                     all_parsed_logs.extend(parsed_logs)
             except UnicodeDecodeError:
-                logger.warning(f"Skipping non-text file: {extracted_file}")
+                logger.warning(f"[{task_id}] Skipping non-text file: {extracted_file}")
             except Exception as e:
-                logger.error(f"Error processing {extracted_file}: {str(e)}")
+                logger.error(f"[{task_id}] Error parsing file {extracted_file}: {e}")
 
         if all_parsed_logs:
+            logger.info(f"[{task_id}] Parsed {len(all_parsed_logs)} logs")
             df = combine_logs(all_parsed_logs)
+            log_records = df.to_dict("records")
+
+            logger.info(f"[{task_id}] Storing logs in MongoDB...")
+            result = LogStorageService.store_logs_batch(log_records)
+            logger.info(f"[{task_id}] MongoDB store result: {result}")
+
             output_path = f"{file_path}_{task_id}_output.json"
             df.to_json(output_path, orient="records", date_format="iso")
-            logger.info(f"Processed logs saved to {output_path}")
+            logger.info(f"[{task_id}] Output written to {output_path}")
 
         task_status[task_id] = "completed"
 
     except Exception as e:
-        logger.exception(f"Task {task_id} failed: {str(e)}")
-        task_status[task_id] = "failed"
+        logger.exception(f"[{task_id}] Task failed with exception: {str(e)}")
+        task_status[task_id] = {
+            "status": "failed",
+            "error": str(e)
+        }
+
 
 @router.get("/task/{task_id}")
 def check_task_status(task_id: str):
@@ -153,10 +142,3 @@ async def save_large_upload(upload_file: UploadFile, save_path: Path) -> int:
             outfile.write(chunk)
             total_size += len(chunk)
     return total_size
-=======
-        logger.exception("Unexpected error during ZIP file processing")
-        return JSONResponse(
-            content={"error": f"Failed to process ZIP file: {str(e)}"},
-            status_code=500
-        )
->>>>>>> origin/main
