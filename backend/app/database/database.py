@@ -15,7 +15,7 @@ mongodb = MongoDB()
 async def connect_to_mongo():
     """Create database connection"""
     try:
-        logger.info(f"Connecting to MongoDB at {settings.MONGODB_URL}")
+        logger.info(f"Connecting to MongoDB")
         if not settings.MONGODB_URL:
             raise ValueError("MONGODB_URL is not set in environment variables")
         
