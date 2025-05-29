@@ -22,9 +22,13 @@ export default function ScatterChart({ title, xAxis, yAxis, data }: ScatterChart
         const xValue = isAmount 
           ? `Rs ${params.data[0].toLocaleString()}`
           : params.data[0];
+
+        const yValue = yAxis?.includes('Amount')
+          ? `Rs ${params.data[1].toLocaleString()}`
+          : params.data[1];
         return `${params.seriesName}<br/>
           ${xAxis}: ${xValue}<br/>
-          ${yAxis}: ${params.data[1].toLocaleString()}`;
+          ${yAxis}: ${yValue}`;
       }
     },
     legend: {
@@ -43,7 +47,7 @@ export default function ScatterChart({ title, xAxis, yAxis, data }: ScatterChart
       type: 'value', 
       name: yAxis || 'Y Axis',
       axisLabel: {
-        formatter: (value: number) => `Rs ${value.toLocaleString()}`
+        formatter: (value: number) => `${value.toLocaleString()}`
       }
     },
     series: Object.entries(seriesByType).map(([type, items]) => ({

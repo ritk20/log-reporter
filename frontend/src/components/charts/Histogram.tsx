@@ -25,7 +25,7 @@ export default function Histogram({ title, data, bins = 20 }: HistogramProps) {
       formatter: function(params: { dataIndex: number; value: number }[]) {
         const binStart = (min + params[0].dataIndex * binWidth).toLocaleString();
         const binEnd = (min + (params[0].dataIndex + 1) * binWidth).toLocaleString();
-        return `Amount Range: Rs ${binStart} - $${binEnd}<br/>
+        return `Amount Range: Rs ${binStart} - Rs ${binEnd}<br/>
                 Count: ${params[0].value}`;
       }
     },
@@ -33,7 +33,7 @@ export default function Histogram({ title, data, bins = 20 }: HistogramProps) {
       type: 'category',
       name: 'Amount Range',
       data: Array.from({ length: bins }, (_, i) => 
-        `$${(min + i * binWidth).toLocaleString()}`
+        `Rs ${(min + i * binWidth).toLocaleString()}`
       ),
       axisLabel: {
         rotate: 45,
