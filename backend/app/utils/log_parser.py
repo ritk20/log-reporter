@@ -194,15 +194,27 @@ def combine_logs(logs):
     df["Response_timestamp"] = pd.to_datetime(df["Response_timestamp"], utc=True)
 
     # Log any invalid timestamps for debugging
-    if df["Request_timestamp"].isna().any():
-        print("Invalid Request_timestamps found:", df[df["Request_timestamp"].isna()][["Msg_id", "Request_timestamp"]])
-    if df["Response_timestamp"].isna().any():
-        print("Invalid Response_timestamps found:", df[df["Response_timestamp"].isna()][["Msg_id", "Response_timestamp"]])
+    # if df["Request_timestamp"].isna().any():
+    #     print("Invalid Request_timestamps found:", df[df["Request_timestamp"].isna()][["Msg_id", "Request_timestamp"]])
+    # if df["Response_timestamp"].isna().any():
+    #     print("Invalid Response_timestamps found:", df[df["Response_timestamp"].isna()][["Msg_id", "Response_timestamp"]])
 
-    # Calculate time differences, handling NaT
-    df["Time_to_Transaction"] = df["Response_timestamp"] - df["Request_timestamp"]
-    df["Time_to_Transaction_secs"] = df["Time_to_Transaction"].dt.total_seconds() * 1000
-    df["Time_to_Transaction_secs"] = df["Time_to_Transaction_secs"].fillna(0)  # Handle NaT"""
+    # Replace NaT values with None for MongoDB compatibility
+    df["Request_timestamp"] = df["Request_timestamp"].where(df["Request_timestamp"].notna(), None)
+    df["Response_timestamp"] = df["Response_timestamp"].where(df["Response_timestamp"].notna(), None)
+
+    # Calculate time differences, only for valid timestamps
+    mask = df["Request_timestamp"].notna() & df["Response_timestamp"].notna()
+    df["Time_to_Transaction_secs"] = pd.Series(dtype='float64')  # Initialize with empty series
+    df.loc[mask, "Time_to_Transaction_secs"] = (
+        df.loc[mask, "Response_timestamp"] - df.loc[mask, "Request_timestamp"]
+    ).dt.total_seconds() * 1000
+
+    # Fill missing values with 0
+    df["Time_to_Transaction_secs"] = df["Time_to_Transaction_secs"].fillna(0)
+
+    # df["Time_to_Transaction"] = df["Time_to_Transaction"].fillna(0) 
+    # df.drop(columns=["Time_to_Transaction"], inplace=True, errors='ignore')
 
     # Convert success/failure to binary
     df["Result_of_Transaction"] = df["Result_of_Transaction"].replace({'SUCCESS': 1, 'FAILURE': 0})
