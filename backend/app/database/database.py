@@ -14,7 +14,6 @@ class MongoDB:
 mongodb = MongoDB()
 
 async def connect_to_mongo():
-    """Create database connection"""
     try:
         logger.info("Connecting to MongoDB")
         if not settings.MONGODB_URL:
@@ -24,16 +23,13 @@ async def connect_to_mongo():
         client.admin.command('ping')
         logger.info("MongoDB connection established successfully")
 
-        # Access database and collection
         database = client[settings.MONGODB_DB_NAME]
         collection = database[settings.MONGODB_COLLECTION_NAME]
 
-        # ✅ Assign to the global mongodb instance BEFORE create_indexes()
         mongodb.client = client
         mongodb.database = database
         mongodb.collection = collection
 
-        # ✅ Now safe to create indexes
         create_indexes()
 
         logger.info(f"Connected to MongoDB database: {settings.MONGODB_DB_NAME}")
@@ -44,13 +40,11 @@ async def connect_to_mongo():
         raise
 
 async def close_mongo_connection():
-    """Close database connection"""
-    if mongodb.client is not None:  # Changed from 'if mongodb.client'
+    if mongodb.client is not None:
         mongodb.client.close()
         logger.info("Disconnected from MongoDB")
 
 def create_indexes():
-    """Create database indexes for optimal performance"""
     try:
         if not mongodb.collection:
             raise RuntimeError("MongoDB collection is not initialized")
@@ -62,8 +56,7 @@ def create_indexes():
         logger.error(f"Error creating indexes: {str(e)}")
 
 def get_collection():
-    """Get MongoDB collection instance"""
-    if mongodb.collection is None:  # Changed from 'if mongodb.collection'
+    if mongodb.collection is None:
         logger.error("MongoDB collection not initialized")
         raise RuntimeError("Database connection not established")
     return mongodb.collection

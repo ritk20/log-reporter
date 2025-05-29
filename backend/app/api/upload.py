@@ -42,11 +42,7 @@ async def upload_file(file: UploadFile = File(...),background_task:BackgroundTas
     if not file.filename.endswith(".zip"):
         raise HTTPException(400, "The file is not in Zip format")
     
-    
-    
-    # TODO: validate filename pattern and date
-   
-    
+    # TODO: validate filename pattern and date 
     try:
         task_id = str(uuid.uuid4())
         upload_file = Path("upload")
