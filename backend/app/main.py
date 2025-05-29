@@ -1,12 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-
 from app.api.auth import router as auth_router
 from app.api.upload import router as upload_router
 from app.core.config import settings
 from app.database.database import connect_to_mongo, close_mongo_connection
-
 import logging
 
 logging.basicConfig(level=logging.INFO)
