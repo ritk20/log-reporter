@@ -5,10 +5,12 @@ from pymongo import MongoClient
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from app.api.auth import authenticate_user
 from collections import Counter, defaultdict
+from app.core.config import settings
+
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
-client = MongoClient("mongodb+srv://rit05:hse8b9y2zdof2WSb@cluster0.dbd8igy.mongodb.net/logs?retryWrites=true&w=majority&tls=true")
+client = MongoClient(settings.MONGODB_URL)
 db = client["logs"]
 collection = db["transaction_logs"]
 
