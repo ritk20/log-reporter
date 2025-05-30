@@ -23,17 +23,14 @@ async def connect_to_mongo():
         client = MongoClient(settings.MONGODB_URL)
         client.admin.command('ping')
         logger.info("MongoDB connection established successfully")
-
-        # Access database and collection
+        
         database = client[settings.MONGODB_DB_NAME]
         collection = database[settings.MONGODB_COLLECTION_NAME]
-
-        # ✅ Assign to the global mongodb instance BEFORE create_indexes()
+        
         mongodb.client = client
         mongodb.database = database
         mongodb.collection = collection
 
-        # ✅ Now safe to create indexes
         create_indexes()
 
         logger.info(f"Connected to MongoDB database: {settings.MONGODB_DB_NAME}")
