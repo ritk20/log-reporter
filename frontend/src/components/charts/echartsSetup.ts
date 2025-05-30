@@ -14,6 +14,7 @@ import {
   GridComponent,
   DatasetComponent,
   VisualMapComponent,
+  DataZoomComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
@@ -27,6 +28,7 @@ echarts.use([
   TitleComponent,
   TooltipComponent,
   LegendComponent,
+  DataZoomComponent,
   GridComponent,
   DatasetComponent,
   VisualMapComponent,
