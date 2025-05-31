@@ -19,21 +19,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await fetch('http://localhost:8000/auth/login', {
+      // Create form data as the backend expects Form data
+      const formData = new FormData();
+      formData.append('username', email);
+      formData.append('password', password);
+
+      const response = await fetch('http://localhost:8000/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: formData
       });
       
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('authToken', data.token);
-        setUser(data.user);
+        localStorage.setItem('authToken', data.access_token);
+        // Parse JWT payload to get user info
+        const payload = JSON.parse(atob(data.access_token.split('.')[1]));
+        setUser({
+          id: payload.sub,
+          email: payload.sub,
+          role: payload.role
+        });
+      } else {
+        throw new Error('Login failed');
       }
     } catch (error) {
       throw new Error('Login failed' + (error instanceof Error ? `: ${error.message}` : ''));
     }
-  };
+};
 
   const logout = () => {
     localStorage.removeItem('authToken');

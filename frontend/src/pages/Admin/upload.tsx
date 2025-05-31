@@ -1,9 +1,20 @@
 import { useRef, useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import { Navigate } from 'react-router-dom';
 
 export default function Upload() {
+  const {user} = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.role !== 'admin') {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
   const handleUpload = async () => {
     if (!file) {
@@ -14,26 +25,76 @@ export default function Upload() {
     formData.append("file", file);
 
     try {
-      const response = await fetch("http://localhost:8000/upload", {
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch("http://localhost:8000/api/upload/upload", {
         method: "POST",
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData
       });
+      
+      if (response.status === 401) {
+        throw new Error('Authentication failed');
+      }
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      setMessage(data.detail || "Uploaded successfully");
-      setFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      setMessage(data.message || "Uploaded successfully");
+      
+      // If task_id is returned, poll for status
+      if (data.task_id) {
+        pollTaskStatus(data.task_id);
       }
+
     } catch (err) {
-      // console.error("Upload error:", err);
       setMessage(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-  };
+};
+
+// Add polling function for task status
+const pollTaskStatus = async (taskId: string) => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`http://localhost:8000/api/upload/task/${taskId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        
+        if (data.status === 'completed') {
+          setMessage('File processed successfully!');
+          return true;
+        } else if (data.status === 'failed') {
+          setMessage(`Processing failed: ${data.error || 'Unknown error'}`);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        setMessage('Error checking status');
+        console.error(err);
+        return false; 
+      }
+    };
+
+    // Poll every 2 seconds until complete
+    const poll = setInterval(async () => {
+      const isDone = await checkStatus();
+      if (isDone) clearInterval(poll);
+    }, 2000);
+};
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full">
