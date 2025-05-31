@@ -9,6 +9,8 @@ from app.api.analytics import router as analytics_router
 
 import logging
 
+app = FastAPI()
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,6 @@ async def lifespan(app: FastAPI):
     await connect_to_mongo()
     logger.info("Application startup complete")
     yield
-
     await close_mongo_connection()
     logger.info("Application shutdown complete")
 

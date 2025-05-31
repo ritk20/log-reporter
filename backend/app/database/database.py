@@ -22,10 +22,10 @@ async def connect_to_mongo():
         client = MongoClient(settings.MONGODB_URL)
         client.admin.command('ping')
         logger.info("MongoDB connection established successfully")
-
+        
         database = client[settings.MONGODB_DB_NAME]
         collection = database[settings.MONGODB_COLLECTION_NAME]
-
+        
         mongodb.client = client
         mongodb.database = database
         mongodb.collection = collection
