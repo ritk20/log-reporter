@@ -10,6 +10,8 @@ import DuplicateTokensTable, { type DuplicateToken } from '../../components/publ
 //TODO: Replace with real data fetching logic
 import duplicateData from '../../../public/duplicate.json'
 import TemporalDashboard from '../../components/charts/TimeSeries.tsx';
+import './print-analytics.css';
+// import KPIcards from '../../components/public/KPIcards.tsx';
 
 //TODO: Change the data to match the summary data from the backend analytics
 export type Tx = {
@@ -35,6 +37,8 @@ type TxSummary = {
   total: number
   successRate: number
   averageProcessingTime: number
+  medianProcessingTime: number
+  stdDevProcessingTime: number
   lastXTransactions: Tx[]
   crossTypeOp: Record<Tx['type'], Record<Tx['operation'], number>>
   crossTypeError: Record<Tx['type'], Record<Tx['error'], number>>
@@ -73,6 +77,11 @@ function genDataSummary(): TxSummary {
   const total = data.length;
   const successRate = data.filter(d => d.result === 'success').length / total * 100;
   const averageProcessingTime = data.reduce((acc, d) => acc + d.processingTime, 0) / total;
+  const medianProcessingTime = data
+    .map(d => d.processingTime)
+    .sort((a, b) => a - b)[Math.floor(total / 2)];
+  const stdDevProcessingTime = Math.sqrt(
+    data.reduce((acc, d) => acc + Math.pow(d.processingTime - averageProcessingTime, 2), 0) / total);
   const lastXTransactions = data.slice(-20);
 
   const crossTypeOp: Record<Tx['type'], Record<Tx['operation'], number>> = {
@@ -135,6 +144,8 @@ function genDataSummary(): TxSummary {
     total,
     successRate,
     averageProcessingTime,
+    medianProcessingTime,
+    stdDevProcessingTime,
     lastXTransactions,
     crossTypeOp,
     crossTypeError,
@@ -186,11 +197,42 @@ export default function AnalyticsPage() {
     useMemo(() => {
       setDuplicates(duplicateData as DuplicateToken[]);
     }, []);
+
+    const handleDownloadPDF = () => {
+    // Hide the download button before printing
+    const downloadBtn = document.getElementById('download-pdf-btn');
+    if (downloadBtn) {
+      downloadBtn.style.display = 'none';
+    }
     
+    // Trigger browser's native print dialog
+    window.print();
+    
+    // Show the button again after print dialog closes
+    setTimeout(() => {
+      if (downloadBtn) {
+        downloadBtn.style.display = 'block';
+      }
+    }, 1000);
+  };
+
   return (
-    <div>
-      <h1 className='text-2xl font-bold mb-3 flex justify-center'>Transaction Analytics</h1>
-      <p className='mb-2 flex justify-center text-center'>Overview of the total transaction data, including types, operations, errors, and processing times.</p>
+    <div className="analytics-container" id="analytics-content">
+      <div className="flex-1 flex justify-center">
+        <div id="analytics-header" className="flex flex-col items-center">
+          <h1 className='text-2xl font-bold'>Transaction Analytics Dashboard</h1>
+          <div id="date-range" className='text-xl font-semibold'>Report Period: Last 30 Days</div>
+          <button 
+            id="download-pdf-btn"
+            className='px-4 mb-2 underline text-blue-500 cursor-pointer no-print'
+            onClick={handleDownloadPDF}
+          >
+            Download as PDF
+          </button>
+          </div>
+      </div>
+
+      {/* <KPIcards title="Transaction Summary" value={dataSummary.averageProcessingTime} median={dataSummary.medianProcessingTime} stdev={dataSummary.stdDevProcessingTime}/> */}
 
       <p className='flex justify-center'>Total Transactions = {dataSummary.total}</p>
       <p className='flex justify-center mb-4'>Success Rate = {dataSummary.successRate}%</p>
@@ -255,12 +297,12 @@ export default function AnalyticsPage() {
           </div>
         </div>
       </div>
-      <div className="mt-8">
+      <div className="mt-8" id='analytics-table'>
         <h2 className="text-xl font-semibold mb-4">Duplicate Token Anomalies</h2>
         <DuplicateTokensTable duplicates={duplicates} />
       </div>
       
-      <div className='mt-8'>
+      <div className='mt-8 chart-container'>
         <h2 className='text-xl font-semibold mb-4'>Temporal Dashboard</h2>
         <TemporalDashboard rawData={data}/>
       </div>

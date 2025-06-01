@@ -130,7 +130,7 @@ export default function DuplicateTokensAccordion({
                     <td className="px-4 py-2 text-sm text-gray-700 italic">
                       When: {new Date(occ.timestamp).toLocaleString()}
                     </td>
-                    <td colSpan={2} /> {/* pad the remaining columns */}
+                    <td colSpan={2} />
                   </tr>
                 ))}
             </React.Fragment>
@@ -150,7 +150,7 @@ export default function DuplicateTokensAccordion({
         <button
           disabled={page === 0}
           onClick={() => setPage(p => Math.max(0, p - 1))}
-          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
         >
           ← Prev
         </button>
@@ -160,7 +160,7 @@ export default function DuplicateTokensAccordion({
         <button
           disabled={page + 1 >= pageCount}
           onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}
-          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
         >
           Next →
         </button>
