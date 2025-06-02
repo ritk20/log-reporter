@@ -16,7 +16,7 @@ from app.utils.thread_pool_processing import run_in_thread_pool
 from app.api.auth_jwt import verify_token
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/upload", tags=["Upload"])
+router = APIRouter(prefix="/api/upload", tags=["Upload"])
 
 FILENAME_REGEX = re.compile(settings.FILENAME_REGEX)
 
@@ -46,7 +46,7 @@ async def save_large_upload(upload_file: UploadFile, save_path: Path) -> int:
 
 async def upload_file(
     file: UploadFile = File(...),
-    current_user: dict = Depends(verify_token)  # This verifies authentication
+    current_user: dict = Depends(verify_token)
 ):
     # Log authentication info immediately
     logger.info(f"Upload request from user: {current_user.get('username', 'unknown')}")

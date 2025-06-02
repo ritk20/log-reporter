@@ -5,11 +5,6 @@ import re
 import base64
 import json
 
-
-
-# ---------- Utility Functions ----------
-
-# parser_log_file_from_content should start correctly
 def parser_log_file_from_content(content: str):
     log_pattern = re.compile(
         r'(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\s+(?P<level>\w+)\s+(?P<module>[\w:]+(?:\{[^\}]+\})?):\s+(?P<message>.*?)(?=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z|$)',
@@ -193,12 +188,6 @@ def combine_logs(logs):
     df["Request_timestamp"] = pd.to_datetime(df["Request_timestamp"], utc=True)
     df["Response_timestamp"] = pd.to_datetime(df["Response_timestamp"], utc=True)
 
-    # Log any invalid timestamps for debugging
-    # if df["Request_timestamp"].isna().any():
-    #     print("Invalid Request_timestamps found:", df[df["Request_timestamp"].isna()][["Msg_id", "Request_timestamp"]])
-    # if df["Response_timestamp"].isna().any():
-    #     print("Invalid Response_timestamps found:", df[df["Response_timestamp"].isna()][["Msg_id", "Response_timestamp"]])
-
     # Replace NaT values with None for MongoDB compatibility
     df["Request_timestamp"] = df["Request_timestamp"].where(df["Request_timestamp"].notna(), None)
     df["Response_timestamp"] = df["Response_timestamp"].where(df["Response_timestamp"].notna(), None)
@@ -212,9 +201,6 @@ def combine_logs(logs):
 
     # Fill missing values with 0
     df["Time_to_Transaction_secs"] = df["Time_to_Transaction_secs"].fillna(0)
-
-    # df["Time_to_Transaction"] = df["Time_to_Transaction"].fillna(0) 
-    # df.drop(columns=["Time_to_Transaction"], inplace=True, errors='ignore')
 
     # Convert success/failure to binary
     df["Result_of_Transaction"] = df["Result_of_Transaction"].replace({'SUCCESS': 1, 'FAILURE': 0})
@@ -230,8 +216,3 @@ def combine_logs(logs):
     df = df.drop(columns=["SenderOrgId", "ReceiverOrgId"], errors='ignore')
     df.dropna()
     return df
-
-# ------------------- FastAPI Endpoint -------------------
-# --- Ma
-
-# ------------------- FastAPI Endpoint -------------------
