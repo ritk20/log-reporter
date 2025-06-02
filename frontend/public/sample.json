@@ -1,0 +1,117 @@
+{
+  "type": {
+  "LOAD": 47,
+  "TRANSFER": 52,
+  "REDEEM": 1
+  },
+  "operation": {
+  "SPLIT": 30,
+  "MERGE": 33,
+  "ISSUE": 37
+  },
+  "error": {
+  "No error": 82,
+  "AS403": 5,
+  "AS402": 4,
+  "AS404": 9
+  },
+  "result": {
+  "success": 90,
+  "failure": 10
+  },
+  "total": 1000,
+  "successRate": 90.00,
+  "averageProcessingTime": 856.32,
+  "lastXTransactions": [
+    {
+      "Transaction_Id": "tx-a7b3c9d2e5",
+      "Msg_id": "msg-f8g6h4j2k1",
+      "type": "TRANSFER",
+      "operation": "SPLIT",
+      "error": "No error",
+      "result": "success",
+      "request_time": "2025-05-30T10:15:30.123Z",
+      "response_time": "2025-05-30T10:15:31.234Z",
+      "amount": 5000.50,
+      "processingTime": 1111.11,
+      "number_of_inputs": 2,
+      "number_of_outputs": 3
+    }
+  ],
+  "crossTypeOp": {
+    "LOAD": {
+      "SPLIT": 150,
+      "MERGE": 120,
+      "ISSUE": 80
+    },
+    "TRANSFER": {
+      "SPLIT": 180,
+      "MERGE": 160,
+      "ISSUE": 90
+    },
+    "REDEEM": {
+      "SPLIT": 90,
+      "MERGE": 100,
+      "ISSUE": 30
+    }
+  },
+  "crossTypeError": {
+    "LOAD": {
+      "No error": 320,
+      "AS403": 15,
+      "AS402": 10,
+      "AS404": 5
+    },
+    "TRANSFER": {
+      "No error": 390,
+      "AS403": 20,
+      "AS402": 12,
+      "AS404": 8
+    },
+    "REDEEM": {
+      "No error": 200,
+      "AS403": 10,
+      "AS402": 5,
+      "AS404": 5
+    }
+  },
+  "crossOpError": {
+    "SPLIT": {
+      "No error": 380,
+      "AS403": 20,
+      "AS402": 12,
+      "AS404": 8
+    },
+    "MERGE": {
+      "No error": 350,
+      "AS403": 15,
+      "AS402": 10,
+      "AS404": 5
+    },
+    "ISSUE": {
+      "No error": 180,
+      "AS403": 10,
+      "AS402": 5,
+      "AS404": 5
+    }
+  },
+  "amountDistribution": [
+    { "x": 0, "y": 1000.50, "type": "LOAD" },
+    { "x": 1, "y": 2500.75, "type": "TRANSFER" },
+    { "x": 2, "y": 1750.25, "type": "REDEEM" }
+  ],
+  "processingTimeByInputs": [
+    { "x": 1, "y": 500.25 },
+    { "x": 2, "y": 750.50 },
+    { "x": 3, "y": 1000.75 },
+    { "x": 4, "y": 1250.25 },
+    { "x": 5, "y": 1500.50 }
+  ],
+  "processingTimeByOutputs": [
+    { "x": 1, "y": 550.25 },
+    { "x": 2, "y": 800.50 },
+    { "x": 3, "y": 1050.75 },
+    { "x": 4, "y": 1300.25 },
+    { "x": 5, "y": 1550.50 }
+  ]
+}
