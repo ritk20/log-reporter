@@ -13,11 +13,10 @@ export function Header() {
   if (!user) return null;
 
   return (
-    <header className="bg-blue-600 text-white shadow-lg">
-      <div className="container mx-auto px-4">
+    <header className="bg-blue-600 text-white w-full shadow-lg">
+      <div className="container px-4">
         <div className="flex justify-between items-center h-16">
           <h1 className="text-xl font-bold">ABAS Analytics</h1>
-          
           <nav className="flex space-x-4">
             <Link to="/analytics" className="hover:underline">
               Analytics
@@ -33,7 +32,7 @@ export function Header() {
               </>
             )}
             <button onClick={handleLogout} className="hover:underline">
-              Logout ({user.email})
+              Logout
             </button>
           </nav>
         </div>

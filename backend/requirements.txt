@@ -2,4 +2,5 @@ fastapi[standard]
 pandas
 pymongo
 dotenv
-motor
+motorpi
+python-jose
