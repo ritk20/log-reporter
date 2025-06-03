@@ -1,14 +1,12 @@
 
 import logging
-import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 import zipfile
 import tempfile
 from pathlib import Path
 import uuid
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends
-from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.utils.log_parser import parser_log_file_from_content, combine_logs
 from app.utils.log_storage import LogStorageService
@@ -21,15 +19,6 @@ router = APIRouter(prefix="/api/upload", tags=["Upload"])
 FILENAME_REGEX = re.compile(settings.FILENAME_REGEX)
 
 task_status = {}
-processed_zip_hashes = set()
-processed_file_hashes = set()
-
-def calculate_file_hash(file_path: Path) -> str:
-    sha256 = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            sha256.update(chunk)
-    return sha256.hexdigest()
 
 async def save_large_upload(upload_file: UploadFile, save_path: Path) -> int:
     total_size = 0
@@ -43,7 +32,6 @@ async def save_large_upload(upload_file: UploadFile, save_path: Path) -> int:
     return total_size
 
 @router.post("/upload", tags=["File Operations"])
-
 async def upload_file(
     file: UploadFile = File(...),
     current_user: dict = Depends(verify_token)
@@ -62,24 +50,6 @@ async def upload_file(
         upload_file_dir.mkdir(parents=True, exist_ok=True)
         save_path = upload_file_dir / f"{file.filename}"
 
-        file_size = await save_large_upload(file, save_path)
-        file_hash = calculate_file_hash(save_path)
-
-        # Include user info in the duplicate check message
-        if file_hash in processed_zip_hashes:
-            logger.warning(f"Duplicate ZIP upload attempted by {current_user.get('username')}: {file.filename}")
-            return JSONResponse(
-                status_code=200,
-                content={
-                    "message": "This ZIP file has already been uploaded and processed",
-                    "user": current_user.get('username'),
-                    "authenticated": True
-                }
-            )
-
-        processed_zip_hashes.add(file_hash)
-        logger.info(f"Received ZIP file from authenticated user {current_user.get('username')}: {file.filename}, Size: {file_size} bytes")
-        
         task_status[task_id] = {
             "status": "processing",
             "user": current_user.get('username'),
@@ -118,11 +88,6 @@ def process_zip_file(task_id: str, file_path: str, user_info: dict):
                 if zip_info.is_dir():
                     continue
                 extracted_path = zip_ref.extract(zip_info, temp_dir)
-
-                nested_hash = calculate_file_hash(Path(extracted_path))
-                if nested_hash in processed_file_hashes:
-                    continue
-                processed_file_hashes.add(nested_hash)
                 extracted_files.append(extracted_path)
 
         all_parsed_logs = []
@@ -142,14 +107,15 @@ def process_zip_file(task_id: str, file_path: str, user_info: dict):
         if all_parsed_logs:
             df = combine_logs(all_parsed_logs)
             records = df.to_dict("records")
-            LogStorageService.store_logs_batch(records)
+            info = LogStorageService.store_logs_batch(records)
+
             df.to_json(f"{file_path}_{task_id}_output.json", orient="records")
 
         task_status[task_id] = {
             "status": "completed",
             "user": user_info.get('username', 'unknown'),
             "filename": Path(file_path).name,
-            "end_time": datetime.utcnow().isoformat()
+            "end_time": datetime.now(datetime.timezone.utc).isoformat()
         }
     except Exception as e:
         logger.exception(f"Failed to process zip: {e}")
@@ -161,6 +127,7 @@ def process_zip_file(task_id: str, file_path: str, user_info: dict):
         }
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
 @router.get("/task/{task_id}")
 def check_task_status(task_id: str, current_user: dict = Depends(verify_token)):
     task = task_status.get(task_id)

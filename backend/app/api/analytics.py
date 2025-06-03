@@ -11,8 +11,8 @@ from app.core.config import settings
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 client = MongoClient(settings.MONGODB_URL)
-db = client["logs"]
-collection = db["transaction_logs"]
+db = client[settings.MONGODB_DB_NAME]
+collection = db[settings.MONGODB_COLLECTION_NAME]
 
 security = HTTPBasic()
 
@@ -182,17 +182,57 @@ async def analytics_summary(authenticated: bool = Depends(verify_user)):
 
         # 9) Processing Time by Inputs
         pipeline_time_inputs = [
-            {"$group": {"_id": "$NumberOfInputs", "avgTime": {"$avg": "$Time_to_Transaction_secs"}}}
+        {
+            "$match": {
+                "Time_to_Transaction_secs": {"$ne": None},
+                "NumberOfInputs": {"$ne": None}
+            }
+        },
+        {
+            "$group": {
+                "_id": "$NumberOfInputs",
+                "avgTime": {"$avg": "$Time_to_Transaction_secs"}
+            }
+        }
         ]
-        results_time_inputs = list(collection.aggregate(pipeline_time_inputs))
-        processing_time_by_inputs = [{"x": r["_id"], "y": r["avgTime"]} for r in results_time_inputs]
 
-        # 10) Processing Time by Outputs
         pipeline_time_outputs = [
-            {"$group": {"_id": "$NumberOfOutputs", "avgTime": {"$avg": "$Time_to_Transaction_secs"}}}
+            {
+                "$match": {
+                    "Time_to_Transaction_secs": {"$ne": None},
+                    "NumberOfOutputs": {"$ne": None}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$NumberOfOutputs",
+                    "avgTime": {"$avg": "$Time_to_Transaction_secs"}
+                }
+            }
         ]
+
+        # Add null checks and default values
+        results_time_inputs = list(collection.aggregate(pipeline_time_inputs))
+        processing_time_by_inputs = [
+            {
+                "x": r["_id"], 
+                "y": r["avgTime"] if r["avgTime"] is not None else 0
+            } 
+            for r in results_time_inputs
+        ]
+
         results_time_outputs = list(collection.aggregate(pipeline_time_outputs))
-        processing_time_by_outputs = [{"x": r["_id"], "y": r["avgTime"]} for r in results_time_outputs]
+        processing_time_by_outputs = [
+            {
+                "x": r["_id"], 
+                "y": r["avgTime"] if r["avgTime"] is not None else 0
+            } 
+            for r in results_time_outputs
+        ]
+
+        # Update the success rate and average processing time calculations
+        success_rate = (total_success / total_transactions * 100) if total_transactions > 0 else 0
+        avg_processing_time = (total_processing_time / total_transactions) if total_transactions > 0 else 0
 
         return {
             "type": type_list,
@@ -201,11 +241,11 @@ async def analytics_summary(authenticated: bool = Depends(verify_user)):
             "result": result_list,
             "mergedTransactionAmountIntervals": bucket_docs,
             "total": total_transactions,
-            "successRate": success_rate,
-            "averageProcessingTime": avg_processing_time,
-            "crossTypeOp": cross_type_op,
-            "crossTypeError": cross_type_error,
-            "crossOpError": cross_op_error,
+            "successRate": round(success_rate, 2),
+            "averageProcessingTime": round(avg_processing_time,2),
+            "crossTypeOp": dict(cross_type_op),
+            "crossTypeError": dict(cross_type_error),
+            "crossOpError": dict(cross_op_error),
             "processingTimeByInputs": processing_time_by_inputs,
             "processingTimeByOutputs": processing_time_by_outputs,
         }
