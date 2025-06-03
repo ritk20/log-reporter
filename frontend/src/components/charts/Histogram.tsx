@@ -1,57 +1,63 @@
 import ReactECharts from 'echarts-for-react';
 
-type HistogramProps = {
+interface HistogramProps {
   title: string;
-  data: number[];
-  bins?: number;
-};
+  data: Array<{
+    name: string;
+    total: number;
+    LOAD: number;
+    TRANSFER: number;
+    REDEEM: number;
+  }>;
+  stacked?: boolean;
+}
 
-export default function Histogram({ title, data, bins = 20 }: HistogramProps) {
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const binWidth = (max - min) / bins;
-  
-  const histData = new Array(bins).fill(0);
-  
-  data.forEach(value => {
-    const binIndex = Math.min(Math.floor((value - min) / binWidth), bins - 1);
-    histData[binIndex]++;
-  });
-  
-  const options = {
+export default function Histogram({ title, data, stacked = false }: HistogramProps) {
+  const option = {
     title: { text: title, left: 'center' },
     tooltip: {
       trigger: 'axis',
-      formatter: function(params: { dataIndex: number; value: number }[]) {
-        const binStart = (min + params[0].dataIndex * binWidth).toLocaleString();
-        const binEnd = (min + (params[0].dataIndex + 1) * binWidth).toLocaleString();
-        return `Amount Range: Rs ${binStart} - Rs ${binEnd}<br/>
-                Count: ${params[0].value}`;
-      }
+      axisPointer: { type: 'shadow' }
+    },
+    legend: {
+      data: ['LOAD', 'TRANSFER', 'REDEEM'],
+      top: 30,
     },
     xAxis: {
       type: 'category',
-      name: 'Amount Range',
-      data: Array.from({ length: bins }, (_, i) => 
-        `Rs ${(min + i * binWidth).toLocaleString()}`
-      ),
-      axisLabel: {
-        rotate: 45,
-        interval: Math.floor(bins / 5)
-      }
+      data: data.map(d => d.name),
+      axisLabel: { rotate: 45 }
     },
     yAxis: {
       type: 'value',
       name: 'Number of Transactions'
     },
-    series: [{
-      type: 'bar',
-      data: histData,
-      barWidth: '99%'
-    }]
+    series: [
+      {
+        name: 'LOAD',
+        type: 'bar',
+        stack: stacked ? 'total' : undefined,
+        data: data.map(d => d.LOAD)
+      },
+      {
+        name: 'TRANSFER',
+        type: 'bar',
+        stack: stacked ? 'total' : undefined,
+        data: data.map(d => d.TRANSFER)
+      },
+      {
+        name: 'REDEEM',
+        type: 'bar',
+        stack: stacked ? 'total' : undefined,
+        data: data.map(d => d.REDEEM)
+      }
+    ]
   };
 
   return (
-    <ReactECharts style={{ height: 300 }} option={options} />
+    <ReactECharts 
+      option={option} 
+      style={{ height: 400 }} 
+    />
   );
 }
