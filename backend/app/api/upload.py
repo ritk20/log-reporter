@@ -1,64 +1,38 @@
-
-import logging
-from datetime import datetime, timedelta
-import re
-import zipfile
-import tempfile
+import uuid, logging
 from pathlib import Path
-import uuid
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends
-from app.core.config import settings
-from app.utils.log_parser import parser_log_file_from_content, combine_logs
-from app.utils.log_storage import LogStorageService
-from app.utils.thread_pool_processing import run_in_thread_pool
+from datetime import datetime
 from app.api.auth_jwt import verify_token
+from app.services.file_saver import save_large_upload
+from app.services.task_manager import create_task, get_task
+from app.services.zip_processor import process_zip_file
+from app.utils.thread_pool_processing import run_in_thread_pool
+import os
+print("file_saver exists:", os.path.exists("app/services/file_saver.py"))
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/upload", tags=["Upload"])
 
-FILENAME_REGEX = re.compile(settings.FILENAME_REGEX)
-
-task_status = {}
-
-async def save_large_upload(upload_file: UploadFile, save_path: Path) -> int:
-    total_size = 0
-    with open(save_path, "wb") as outfile:
-        while True:
-            chunk = await upload_file.read(1024 * 1024)  # Read 1 MB at a time
-            if not chunk:
-                break
-            outfile.write(chunk)
-            total_size += len(chunk)
-    return total_size
-
-@router.post("/upload", tags=["File Operations"])
-async def upload_file(
-    file: UploadFile = File(...),
-    current_user: dict = Depends(verify_token)
-):
-    # Log authentication info immediately
+@router.post("/upload")
+async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(verify_token)):
     logger.info(f"Upload request from user: {current_user.get('username', 'unknown')}")
-    logger.info(f"User roles: {current_user.get('roles', [])}")
-    logger.info(f"Authentication method: {current_user.get('auth_method', 'unknown')}")
 
     if not file.filename.endswith(".zip"):
         raise HTTPException(400, "The file is not in Zip format")
 
     try:
         task_id = str(uuid.uuid4())
-        upload_file_dir = Path("upload")
-        upload_file_dir.mkdir(parents=True, exist_ok=True)
-        save_path = upload_file_dir / f"{file.filename}"
+        upload_dir = Path("upload")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        save_path = upload_dir / file.filename
 
-        task_status[task_id] = {
-            "status": "processing",
-            "user": current_user.get('username'),
-            "authenticated": True,
-            "auth_time": datetime.utcnow().isoformat()
-        }
+        file_size = await save_large_upload(file, save_path)
+        logger.info(f"Received ZIP: {file.filename}, Size: {file_size} bytes")
 
+        create_task(task_id, current_user.get('username'))
         run_in_thread_pool(process_zip_file, task_id, str(save_path), current_user)
-        
+
         return {
             "task_id": task_id,
             "status": "processing",
@@ -68,78 +42,20 @@ async def upload_file(
         }
 
     except Exception as e:
-        logger.exception(f"Upload failed for user {current_user.get('username')}")
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": str(e),
-                "authenticated": True,
-                "user": current_user.get('username')
-            }
-        )
-def process_zip_file(task_id: str, file_path: str, user_info: dict):
-    import shutil
-    try:
-        temp_dir = tempfile.mkdtemp()
-        extracted_files = []
-
-        with zipfile.ZipFile(file_path, 'r') as zip_ref:
-            for zip_info in zip_ref.infolist():
-                if zip_info.is_dir():
-                    continue
-                extracted_path = zip_ref.extract(zip_info, temp_dir)
-                extracted_files.append(extracted_path)
-
-        all_parsed_logs = []
-        for file in extracted_files:
-            try:
-                with open(file, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    logs = parser_log_file_from_content(content)
-                    # Add user information to each log entry
-                    for log in logs:
-                        log['uploaded_by'] = user_info.get('username', 'unknown')
-                        log['user_id'] = user_info.get('user_id', 'unknown')
-                    all_parsed_logs.extend(logs)
-            except Exception as e:
-                logger.warning(f"Failed to parse file {file}: {e}")
-
-        if all_parsed_logs:
-            df = combine_logs(all_parsed_logs)
-            records = df.to_dict("records")
-            info = LogStorageService.store_logs_batch(records)
-
-            df.to_json(f"{file_path}_{task_id}_output.json", orient="records")
-
-        task_status[task_id] = {
-            "status": "completed",
-            "user": user_info.get('username', 'unknown'),
-            "filename": Path(file_path).name,
-            "end_time": datetime.now(datetime.timezone.utc).isoformat()
-        }
-    except Exception as e:
-        logger.exception(f"Failed to process zip: {e}")
-        task_status[task_id] = {
-            "status": "failed", 
-            "error": str(e),
-            "user": user_info.get('username', 'unknown'),
-            "filename": Path(file_path).name
-        }
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        logger.exception("Upload failed")
+        raise HTTPException(status_code=500, detail={"error": str(e)})
 
 @router.get("/task/{task_id}")
 def check_task_status(task_id: str, current_user: dict = Depends(verify_token)):
-    task = task_status.get(task_id)
+    task = get_task(task_id)
     if not task:
         return {
             "error": "Task not found",
             "authenticated": True,
             "user": current_user.get('username')
         }
-    
-    # Add authentication verification to the response
-    response = {
+
+    return {
         "task_id": task_id,
         "status": task.get("status"),
         "requested_by": current_user.get('username'),
@@ -147,18 +63,7 @@ def check_task_status(task_id: str, current_user: dict = Depends(verify_token)):
         "is_owner": current_user.get('username') == task.get("user"),
         "authenticated": True
     }
-    
-    # Only show full details to task owner or admins
-    if current_user.get('username') == task.get("user") or "admin" in current_user.get('roles', []):
-        response.update({
-            "filename": task.get("filename"),
-            "start_time": task.get("start_time"),
-            "details": task  # Include all task details
-        })
-    else:
-        response["message"] = "Limited view: only task owners can see full details"
-    
-    return response
+
 @router.get("/verify-auth")
 async def verify_authentication(current_user: dict = Depends(verify_token)):
     return {
