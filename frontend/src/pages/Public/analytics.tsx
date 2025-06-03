@@ -14,54 +14,16 @@ import './print-analytics.css';
 // import KPIcards from '../../components/public/KPIcards.tsx';
 
 import { useAnalytics } from '../../hooks/useAnalytics.tsx';
-
-//TODO: Change the data to match the summary data from the backend analytics
-export type Tx = {
-  Transaction_Id: string
-  Msg_id: string 
-  type: 'LOAD' | 'TRANSFER' | 'REDEEM'
-  operation: 'SPLIT' | 'MERGE' | 'ISSUE'
-  error: 'No error' | 'AS403' | 'AS402' | 'AS404'
-  result: 'success' | 'failure'
-  request_time: string // ISO date string
-  response_time: string // ISO date string
-  amount: number
-  processingTime: number
-  number_of_inputs: number
-  number_of_outputs: number
-}
-
-export interface AmountInterval {
-  interval: string;
-  total: number;
-  load: number;
-  transfer: number;
-  redeem: number;
-}
-
-export type TxSummary = {
-  type: Array<Record<string, number>>
-  operation: Array<Record<string, number>>
-  error: Array<Record<string, number>>
-  result: Array<Record<string, number>>
-  total: number
-  successRate: number
-  averageProcessingTime: number
-  medianProcessingTime: number
-  stdDevProcessingTime: number
-  lastXTransactions: Tx[]
-  crossTypeOp: Record<Tx['type'], Record<Tx['operation'], number>>
-  crossTypeError: Record<Tx['type'], Record<Tx['error'], number>>
-  crossOpError: Record<Tx['operation'], Record<Tx['error'], number>>
-  amountDistribution: Array<{ x: number; y: number; type?: Tx['type'] }>
-  mergedTransactionAmountIntervals: AmountInterval[]
-  processingTimeByInputs: Array<{ x: number; y: number }>
-  processingTimeByOutputs: Array<{ x: number; y: number }>
-}
+import { Tx } from '../../types/data.ts';
 
 export default function AnalyticsPage() {
     const { data, isLoading, error } = useAnalytics();
     const [duplicates, setDuplicates] = useState<DuplicateToken[]>([]);
+    const [sampleData, setSampleData] = useState<
+
+    useMemo(() => {
+      set
+    })
 
     useMemo(() => {
       setDuplicates(duplicateData as DuplicateToken[]);
