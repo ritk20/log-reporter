@@ -1,6 +1,6 @@
 import tempfile, zipfile, shutil, logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from app.utils.log_parser import parser_log_file_from_content, combine_logs
 from app.utils.log_storage import LogStorageService
 from .task_manager import update_task
@@ -39,7 +39,7 @@ def process_zip_file(task_id: str, file_path: str, user_info: dict):
             "status": "completed",
             "user": user_info.get('username', 'unknown'),
             "filename": Path(file_path).name,
-            "end_time": datetime.utcnow().isoformat()
+            "end_time": datetime.now(timezone.utc).isoformat()
         })
 
     except Exception as e:

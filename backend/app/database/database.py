@@ -1,4 +1,3 @@
-# from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError
 from app.core.config import settings
