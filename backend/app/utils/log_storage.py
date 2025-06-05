@@ -9,8 +9,8 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 class LogStorageService:
-
-    duplicate_tokens = []
+    min_time = None
+    max_time = None
     @staticmethod
     def store_logs_batch(parsed_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
         collection = get_collection()
@@ -22,6 +22,13 @@ class LogStorageService:
         try:
             bulk_operations = []
             tokens = []
+            duplicate_tokens = []
+
+
+            # Get first and last Request_timestamps from parsed_logs (newly processed logs)
+            global min_time, max_time
+            min_time = min(log['Request_timestamp'] for log in parsed_logs if 'Request_timestamp' in log)
+            max_time = max(log['Request_timestamp'] for log in parsed_logs if 'Request_timestamp' in log)
 
             for log_entry in parsed_logs:
                 if not log_entry.get('Msg_id'):
@@ -49,7 +56,7 @@ class LogStorageService:
                     for input_token in log_entry.get('Inputs', []):
                         existing_token = tokens_collection.find_one({"tokenId": input_token.get("id")})
                         if existing_token:
-                            LogStorageService.duplicate_tokens.append({
+                            duplicate_tokens.append({
                                 "tokenID": existing_token.get("tokenId"),
                                 "firstSeen": existing_token.get("occurances", [{}])[0].get("timestamp") if existing_token.get("occurances") else None,
                                 "lastSeen": existing_token.get("occurances", [{}])[-1].get("timestamp") if existing_token.get("occurances") else None,
