@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 class LogStorageService:
 
+    duplicate_tokens = []
     @staticmethod
     def store_logs_batch(parsed_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
         collection = get_collection()
@@ -21,7 +22,6 @@ class LogStorageService:
         try:
             bulk_operations = []
             tokens = []
-            duplicate_tokens = []
 
             for log_entry in parsed_logs:
                 if not log_entry.get('Msg_id'):
@@ -49,7 +49,7 @@ class LogStorageService:
                     for input_token in log_entry.get('Inputs', []):
                         existing_token = tokens_collection.find_one({"tokenId": input_token.get("id")})
                         if existing_token:
-                            duplicate_tokens.append({
+                            LogStorageService.duplicate_tokens.append({
                                 "tokenID": existing_token.get("tokenId"),
                                 "firstSeen": existing_token.get("occurances", [{}])[0].get("timestamp") if existing_token.get("occurances") else None,
                                 "lastSeen": existing_token.get("occurances", [{}])[-1].get("timestamp") if existing_token.get("occurances") else None,
