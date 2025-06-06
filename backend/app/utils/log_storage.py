@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 from pymongo.errors import BulkWriteError
 from pymongo import UpdateOne
-from app.database.database import get_collection, get_tokens_collection
+from app.database.database import get_collection, get_tokens_collection, get_temp_tokens_collection
 from datetime import datetime, timezone
 import logging
 import pandas as pd
@@ -58,6 +58,9 @@ class LogStorageService:
     def store_logs_batch(parsed_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
         collection = get_collection()
         tokens_collection = get_tokens_collection()
+        temp_tokens_collection = get_temp_tokens_collection()
+
+        temp_tokens_collection.delete_many({})
 
         if not parsed_logs:
             logger.info("No logs to store.")
@@ -78,13 +81,13 @@ class LogStorageService:
             tokens_modified_count = 0
             token_write_errors = []
 
-            for log_entry in parsed_logs:
-                if not log_entry.get('Msg_id'):
+            for raw_entry in parsed_logs:
+                if not raw_entry.get('Msg_id'):
                     logger.warning("Log entry missing Msg_id, skipping")
                     continue
 
                 # Clean and convert the log entry
-                log_entry = LogStorageService.clean_log_entry(log_entry.copy())
+                log_entry = LogStorageService.clean_log_entry(raw_entry.copy())
                 
                 if log_entry['Request_timestamp'] is None:
                     logger.warning(f"Skipping log entry with Msg_id {log_entry.get('Msg_id', 'N/A')} due to invalid Request_timestamp")
@@ -140,21 +143,6 @@ class LogStorageService:
                                 upsert=True
                             )
                         )
-            
-            for id in tokenIds:
-                # Find existing token to collect duplicate info
-                existing_token = tokens_collection.find_one({"tokenId": id})
-                if existing_token:
-                    duplicate_tokens.append({
-                        "tokenID": existing_token.get("tokenId"),
-                        "firstSeen": existing_token.get("occurrences", [{}])[0].get("timestamp") if existing_token.get("occurrences") else None,
-                        "lastSeen": existing_token.get("occurrences", [{}])[-1].get("timestamp") if existing_token.get("occurrences") else None,
-                        "count": len(existing_token.get("occurrences", [])),
-                        "numberOfSenders": len(set(o.get("SenderOrgID") for o in existing_token.get("occurrences", []) if o.get("SenderOrgID"))),
-                        "numberOfReceivers": len(set(o.get("ReceiverOrgID") for o in existing_token.get("occurrences", []) if o.get("ReceiverOrgID"))),
-                        "totalAmount": sum(float(o.get("value", 0)) for o in existing_token.get("occurrences", [])),
-                        "occurrences": existing_token.get("occurrences", [])
-                    })
 
             # Insert logs
             if logs_to_insert:
@@ -174,7 +162,31 @@ class LogStorageService:
             else:
                 logger.info("No token operations to perform.")
 
-            logger.info(duplicate_tokens)
+            for id in tokenIds:
+                # Find existing token to collect duplicate info
+                existing_token = tokens_collection.find_one({"tokenId": id})
+                if existing_token:
+                    duplicate_tokens.append({
+                        "tokenID": existing_token.get("tokenId"),
+                        "firstSeen": existing_token.get("occurrences", [{}])[0].get("timestamp") if existing_token.get("occurrences") else None,
+                        "lastSeen": existing_token.get("occurrences", [{}])[-1].get("timestamp") if existing_token.get("occurrences") else None,
+                        "count": len(existing_token.get("occurrences", [])),
+                        "numberOfSenders": len(set(o.get("SenderOrgID") for o in existing_token.get("occurrences", []) if o.get("SenderOrgID"))),
+                        "numberOfReceivers": len(set(o.get("ReceiverOrgID") for o in existing_token.get("occurrences", []) if o.get("ReceiverOrgID"))),
+                        "totalAmount": sum(float(o.get("value", 0)) for o in existing_token.get("occurrences", [])),
+                        "occurrences": existing_token.get("occurrences", [])
+                    })
+            
+            if duplicate_tokens:
+                try:
+                    # Insert new duplicate tokens
+                    temp_tokens_collection.insert_many(duplicate_tokens)
+                    logger.info(f"Stored {len(duplicate_tokens)} duplicate token records in temporary collection")
+                except Exception as e:
+                    logger.error(f"Error storing duplicate tokens in temp collection: {str(e)}", exc_info=True)
+                    # Continue execution even if temp storage fails
+                    pass
+
             return {
                 "logs_inserted": logs_inserted_count,
                 "total_logs_processed": len(parsed_logs),
@@ -195,9 +207,8 @@ class LogStorageService:
                 "total_logs_processed": len(parsed_logs),
                 "tokens_upserted": 0, # Cannot determine precise counts for tokens in this block
                 "tokens_modified": 0,
-                "total_tokens_operations": len(token_bulk_operations),
-                "token_write_errors": [],
-                "duplicate_tokens_info": duplicate_tokens_info
+                "total_tokens_operations": len(tokens),
+                "token_write_errors": []
             }
         except Exception as e:
             logger.error(f"Unexpected error storing logs: {str(e)}", exc_info=True)

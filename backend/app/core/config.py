@@ -28,8 +28,9 @@ class Settings:
     # MongoDB settings
     MONGODB_URL: str = os.getenv("MONGODB_URL")
     MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "logs")
-    MONGODB_COLLECTION_NAME: str = os.getenv("MONGODB_COLLECTION_NAME", "transaction_logs")
+    MONGODB_COLLECTION_NAME: str = os.getenv("MONGODB_COLLECTION_NAME", "master")
     MONGODB_TOKENS_COLLECTION_NAME: str = os.getenv("MONGODB_DUPLICATES_COLLECTION_NAME", "duplicates")
+    MONGODB_TEMP_TOKENS_COLLECTION_NAME: str = os.getenv("MONGODB_TEMP_TOKENS_COLLECTION_NAME", "tempTokens")
 
     class Config:
         env_file = ".env"

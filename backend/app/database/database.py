@@ -10,6 +10,7 @@ class MongoDB:
     database = None
     collection = None
     token_coll = None
+    temp_token_coll = None
 
 mongodb = MongoDB()
 
@@ -75,6 +76,8 @@ def initialize_collections():
         mongodb.token_coll.create_index([("tokenId", 1)], unique=True, background=True)
         mongodb.token_coll.create_index([("timestamp", -1)], background=True)
 
+        mongodb.temp_token_coll = db[settings.MONGODB_TEMP_TOKENS_COLLECTION_NAME]
+
     except Exception as e:
         logger.error(f"Collection initialization failed: {str(e)}")
         raise
@@ -90,6 +93,12 @@ def get_tokens_collection():
         logger.error("MongoDB tokens collection not initialized")
         raise RuntimeError("Database connection not established")
     return mongodb.token_coll
+
+def get_temp_tokens_collection():
+    if mongodb.temp_token_coll is None:
+        logger.error("MongoDB tokens collection not initialized")
+        raise RuntimeError("Database connection not established")
+    return mongodb.temp_token_coll
 
 def get_database_client():
     if mongodb.client is None:
