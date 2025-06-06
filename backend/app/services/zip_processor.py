@@ -32,7 +32,7 @@ def process_zip_file(task_id: str, file_path: str, user_info: dict):
         if all_parsed_logs:
             df = combine_logs(all_parsed_logs)
             records = df.to_dict("records")
-            LogStorageService.store_logs_batch(records)
+            info = LogStorageService.store_logs_batch(records)
             df.to_json(f"{file_path}_{task_id}_output.json", orient="records")
 
         update_task(task_id, {

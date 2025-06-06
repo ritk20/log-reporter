@@ -1,7 +1,7 @@
 from app.utils.findDuplicates import detect_duplicate_tokens
 from app.database.database import get_database_client
 from fastapi import FastAPI, Query, Depends
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 app = FastAPI()
@@ -23,7 +23,7 @@ async def get_duplicate_tokens(
             "data": duplicates,
             "total_duplicates": len(duplicates),
             "time_period": f"{time_value} {time_unit}",
-            "generated_at": datetime.now(datetime.timezone.utc).isoformat()
+            "generated_at": datetime.now(timezone.utc).isoformat()
         }
         
     except Exception as e:

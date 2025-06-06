@@ -2,12 +2,11 @@ from typing import List, Dict, Any
 from pymongo.errors import BulkWriteError
 from pymongo import UpdateOne
 from app.database.database import get_collection, get_tokens_collection
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import pandas as pd
 
 logger = logging.getLogger(__name__)
-
 class LogStorageService:
     min_time = None
     max_time = None
@@ -69,7 +68,7 @@ class LogStorageService:
                             "tokenId": input_token.get("id"),
                             "value": input_token.get("value"),
                             "currency": input_token.get("currency", "unknown"),
-                            "created_at": log_entry['creationTimestamp'],
+                            "created_at": input_token['creationTimestamp'],
                             "SenderOrgId": log_entry.get('SenderOrgId'),
                             "ReceiverOrgId": log_entry.get('ReceiverOrgId'),
                             "transactionId": log_entry['Transaction_Id'],
