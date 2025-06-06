@@ -1,19 +1,19 @@
+import pandas as pd
+import pytz
+import numpy as np
 from typing import List, Dict, Any
 from pymongo.errors import BulkWriteError
 from pymongo import UpdateOne
 from app.database.database import get_collection, get_tokens_collection
 from datetime import datetime, timezone
 import logging
-import pandas as pd
-from datetime import datetime
-import pytz
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
 class LogStorageService:
     min_time = None
     max_time = None
+
     @staticmethod
     def convert_timestamp(ts):
         """Convert timestamp in milliseconds to UTC datetime"""
@@ -28,9 +28,8 @@ class LogStorageService:
         except (TypeError, ValueError) as e:
             logger.warning(f"Failed to convert timestamp {ts}: {str(e)}")
             return None
+
     @staticmethod
-    
-   
     def clean_log_entry(log_entry: Dict[str, Any]) -> Dict[str, Any]:
         """Clean and convert all fields in the log entry"""
         # Convert timestamps
@@ -54,21 +53,37 @@ class LogStorageService:
                 continue
         
         return log_entry
+
     @staticmethod
     def store_logs_batch(parsed_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
         collection = get_collection()
         tokens_collection = get_tokens_collection()
 
         if not parsed_logs:
-            return {"inserted": 0, "errors": 0}
+            logger.info("No logs to store.")
+            return {"inserted": 0, "errors": 0, "tokens_inserted": 0, "tokens_updated": 0}
+
+        logs_to_insert = []
+        token_bulk_operations = [] # Renamed for clarity - these are UpdateOne operations
+        duplicate_tokens_info = [] # Stores information about existing tokens
+
+        # Initialize results
+        logs_inserted_count = 0
+        tokens_upserted_count = 0
+        tokens_modified_count = 0
+        token_write_errors = []
 
         try:
-            logs_to_insert = []
-            tokens = []
-            duplicate_tokens = []
+            # Ensure timestamps are available before calculating min/max
+            valid_timestamps = [log['Request_timestamp'] for log in parsed_logs if 'Request_timestamp' in log and log['Request_timestamp'] is not None]
+            if valid_timestamps:
+                LogStorageService.min_time = min(valid_timestamps)
+                LogStorageService.max_time = max(valid_timestamps)
+            else:
+                LogStorageService.min_time = None
+                LogStorageService.max_time = None
+                logger.warning("No valid Request_timestamp found in parsed logs.")
 
-            LogStorageService.min_time = min(log['Request_timestamp'] for log in parsed_logs if 'Request_timestamp' in log)
-            LogStorageService.max_time = max(log['Request_timestamp'] for log in parsed_logs if 'Request_timestamp' in log)
 
             for log_entry in parsed_logs:
                 if not log_entry.get('Msg_id'):
@@ -76,97 +91,147 @@ class LogStorageService:
                     continue
 
                 # Clean and convert the log entry
-                log_entry = LogStorageService.clean_log_entry(log_entry.copy())
-                if log_entry['Request_timestamp'] is None:
-                    logger.warning(f"Skipping log entry with Msg_id {log_entry['Msg_id']} due to invalid Request_timestamp")
+                cleaned_log_entry = LogStorageService.clean_log_entry(log_entry.copy())
+                
+                if cleaned_log_entry['Request_timestamp'] is None:
+                    logger.warning(f"Skipping log entry with Msg_id {cleaned_log_entry.get('Msg_id', 'N/A')} due to invalid Request_timestamp")
                     continue
                 
                 # Add metadata
-                log_entry['_processed_at'] = datetime.now(timezone.utc)
-                log_entry['_version'] = 1
+                cleaned_log_entry['_processed_at'] = datetime.now(timezone.utc)
+                cleaned_log_entry['_version'] = 1
+
+                logs_to_insert.append(cleaned_log_entry)
 
                 # Prepare token data for successful transactions
-                if log_entry.get('Result_of_Transaction') == 1:
-                    for input_token in log_entry.get('Inputs', []):
-                        # Add your token processing logic here
-                        existing_token = tokens_collection.find_one({"tokenId": input_token.get("id")})
+                if cleaned_log_entry.get('Result_of_Transaction') == 1:
+                    for input_token in cleaned_log_entry.get('Inputs', []):
+                        token_id = input_token.get("id")
+                        if not token_id:
+                            logger.warning(f"Skipping token without ID in Msg_id {cleaned_log_entry['Msg_id']}")
+                            continue
+
+                        # Find existing token to collect duplicate info
+                        existing_token = tokens_collection.find_one({"tokenId": token_id})
                         if existing_token:
-                            duplicate_tokens.append({
+                            duplicate_tokens_info.append({
                                 "tokenID": existing_token.get("tokenId"),
-                                "firstSeen": existing_token.get("occurances", [{}])[0].get("timestamp") if existing_token.get("occurances") else None,
-                                "lastSeen": existing_token.get("occurances", [{}])[-1].get("timestamp") if existing_token.get("occurances") else None,
-                                "count": len(existing_token.get("occurances", [])),
-                                "numberOfSenders": len(set(o.get("SenderOrgID") for o in existing_token.get("occurances", []) if o.get("SenderOrgID"))),
-                                "numberOfReceivers": len(set(o.get("ReceiverOrgID") for o in existing_token.get("occurances", []) if o.get("ReceiverOrgID"))),
-                                "occurances": existing_token.get("occurances", [])
+                                "firstSeen": existing_token.get("occurrences", [{}])[0].get("timestamp") if existing_token.get("occurrences") else None,
+                                "lastSeen": existing_token.get("occurrences", [{}])[-1].get("timestamp") if existing_token.get("occurrences") else None,
+                                "count": len(existing_token.get("occurrences", [])),
+                                "numberOfSenders": len(set(o.get("SenderOrgID") for o in existing_token.get("occurrences", []) if o.get("SenderOrgID"))),
+                                "numberOfReceivers": len(set(o.get("ReceiverOrgID") for o in existing_token.get("occurrences", []) if o.get("ReceiverOrgID"))),
+                                "occurrences": existing_token.get("occurrences", []) # Keep original name for consistency
                             })
-                        token = {
-                            "tokenId": input_token.get("id"),
-                            "value": input_token.get("value"),
-                            "currency": input_token.get("currency", "unknown"),
-                            "created_at": input_token['creationTimestamp'],
-                            "SenderOrgId": log_entry.get('SenderOrgId'),
-                            "ReceiverOrgId": log_entry.get('ReceiverOrgId'),
-                            "transactionId": log_entry['Transaction_Id'],
-                            "Msg_id": log_entry['Msg_id'],
-                            "_processed_at": log_entry['_processed_at'],
-                            "_version": 1
-                        }
-                        tokens.append(
-                            UpdateOne(
-                                {"tokenId": token["tokenId"]},
-                                {"$set": token},
-                                upsert=True
+                            # Append new occurrence to existing token's occurrences
+                            new_occurrence = {
+                                "timestamp": cleaned_log_entry['Request_timestamp'], # Or Response_timestamp, depending on logic
+                                "SenderOrgID": cleaned_log_entry.get('SenderOrgId'),
+                                "ReceiverOrgID": cleaned_log_entry.get('ReceiverOrgId'),
+                                "transactionId": cleaned_log_entry.get('Transaction_Id'),
+                                "Msg_id": cleaned_log_entry['Msg_id']
+                            }
+                            token_bulk_operations.append(
+                                UpdateOne(
+                                    {"tokenId": token_id},
+                                    {
+                                        "$set": {
+                                            "value": input_token.get("value"),
+                                            "currency": input_token.get("currency", "unknown"),
+                                            "created_at": input_token.get('creationTimestamp'), # This might need careful handling if it's the creation of the token vs. this specific occurrence
+                                            "_processed_at": cleaned_log_entry['_processed_at'],
+                                            "_version": 1
+                                        },
+                                        "$addToSet": {"occurrences": new_occurrence} # Using $addToSet to avoid duplicate occurrences
+                                    },
+                                    upsert=True # Still use upsert for initial creation or update
+                                )
                             )
-                        )
+                        else:
+                            # Token is new, prepare for upsert (insert if not exists, update if exists)
+                            # The 'token' structure should reflect how it's stored in MongoDB,
+                            # often with an array for occurrences.
+                            new_token_doc = {
+                                "tokenId": token_id,
+                                "value": input_token.get("value"),
+                                "currency": input_token.get("currency", "unknown"),
+                                "created_at": input_token.get('creationTimestamp'), # Initial creation timestamp
+                                "occurrences": [{
+                                    "timestamp": cleaned_log_entry['Request_timestamp'],
+                                    "SenderOrgID": cleaned_log_entry.get('SenderOrgId'),
+                                    "ReceiverOrgID": cleaned_log_entry.get('ReceiverOrgId'),
+                                    "transactionId": cleaned_log_entry.get('Transaction_Id'),
+                                    "Msg_id": cleaned_log_entry['Msg_id']
+                                }],
+                                "_processed_at": cleaned_log_entry['_processed_at'],
+                                "_version": 1
+                            }
+                            token_bulk_operations.append(
+                                UpdateOne(
+                                    {"tokenId": token_id},
+                                    {"$set": new_token_doc}, # Use $set for initial insert
+                                    upsert=True
+                                )
+                            )
 
-                logs_to_insert.append(log_entry)
 
-            # Insert logs
+            # --- Perform writes to MongoDB ---
+
+            # Insert logs (main collection)
             if logs_to_insert:
                 result = collection.insert_many(logs_to_insert, ordered=False)
-                return {
-                    "inserted": len(result.inserted_ids),
-                    "total_processed": len(logs_to_insert),
-                    "errors": 0
-                }
-            if tokens:
-                token_result = tokens_collection.bulk_write(tokens, ordered=False)
+                logs_inserted_count = len(result.inserted_ids)
+                logger.info(f"Inserted {logs_inserted_count} log entries into main collection.")
+            else:
+                logger.info("No new log entries to insert into main collection.")
+
+            # Bulk write tokens (tokens collection)
+            if token_bulk_operations:
+                token_result = tokens_collection.bulk_write(token_bulk_operations, ordered=False)
+                tokens_upserted_count = token_result.upserted_count
+                tokens_modified_count = token_result.modified_count
+                token_write_errors = token_result.bulk_api_result.get('writeErrors', [])
+                logger.info(f"Tokens bulk write: upserted={tokens_upserted_count}, modified={tokens_modified_count}, errors={len(token_write_errors)}")
+            else:
+                logger.info("No token operations to perform.")
+
 
             return {
-                "inserted": result.upserted_count,
-                "updated": result.modified_count,
-                "matched": result.matched_count,
-                "errors": 0,
-                "total_processed": len(logs_to_insert),
-                "tokens_inserted": token_result.upserted_count if tokens else 0,
-                "tokens_updated": token_result.modified_count if tokens else 0,
-                "token_errors": token_result.bulk_api_result.get('writeErrors', []),
-                "token_matched": token_result.matched_count if tokens else 0,
-                "token_total_processed": len(tokens) if tokens else 0,
-                "duplicate_tokens": duplicate_tokens
+                "logs_inserted": logs_inserted_count,
+                "total_logs_processed": len(parsed_logs),
+                "tokens_upserted": tokens_upserted_count,
+                "tokens_modified": tokens_modified_count,
+                "total_tokens_operations": len(token_bulk_operations),
+                "token_write_errors": token_write_errors,
+                "duplicate_tokens_info": duplicate_tokens_info
             }
 
         except BulkWriteError as e:
-            logger.error(f"Bulk write error: {str(e)}")
+            logger.error(f"Bulk write error: {str(e)} - Details: {e.details}", exc_info=True)
+            # You can parse e.details for more granular error info
             return {
-                "inserted": e.details.get('nInserted', 0),
-                "updated": e.details.get('nModified', 0),
+                "logs_inserted": e.details.get('nInserted', 0),
                 "errors": len(e.details.get('writeErrors', [])),
-                "error_details": e.details
+                "error_details": e.details,
+                "total_logs_processed": len(parsed_logs),
+                "tokens_upserted": 0, # Cannot determine precise counts for tokens in this block
+                "tokens_modified": 0,
+                "total_tokens_operations": len(token_bulk_operations),
+                "token_write_errors": [],
+                "duplicate_tokens_info": duplicate_tokens_info
             }
         except Exception as e:
-            logger.error(f"Unexpected error storing logs: {str(e)}")
+            logger.error(f"Unexpected error storing logs: {str(e)}", exc_info=True)
             raise
         
     @staticmethod
     def get_log_by_msg_id(msg_id: str) -> Dict[str, Any]:
-            collection = get_collection()
-            try:
-                return collection.find_one({"Msg_id": msg_id})
-            except Exception as e:
-                logger.error(f"Error retrieving log {msg_id}: {str(e)}")
-                raise
+        collection = get_collection()
+        try:
+            return collection.find_one({"Msg_id": msg_id})
+        except Exception as e:
+            logger.error(f"Error retrieving log {msg_id}: {str(e)}", exc_info=True)
+            raise
 
     @staticmethod
     def get_logs_count() -> int:
