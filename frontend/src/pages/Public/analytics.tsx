@@ -19,11 +19,25 @@ import KPICard from '../../components/public/KPIcards.tsx';
 
 //TODO: add timeValue and timeUnit to the API call
 export default function AnalyticsPage() {
-    const { data, isLoading, error } = useAnalytics();
     const ops = ['SPLIT', 'MERGE', 'ISSUE'];
     const errors = ['No error', 'AS401', 'AS402', 'AS403', 'AS404', 'AS405'];
-    const [timeValue, setTimeValue] = useState<number>(24); 
-    const [timeUnit, setTimeUnit] = useState<string>('hours');
+
+    //TODO: Add aggregation in backend for fetching timeseries data by a custom range 
+    // const [timeValue, setTimeValue] = useState<number>(24); 
+    // const [timeUnit, setTimeUnit] = useState<string>('hours');
+
+    //for now, we use datepicker for one day/all-time summary
+    // datePicker: "" means no date selected → treat as All Time in our logic
+    
+    // State for date picker and all-time toggle
+    const [selectedDate, setSelectedDate] = useState<string>(''); // empty = no date chosen
+    const [allTime, setAllTime] = useState<boolean>(false);
+
+    // Determine what to pass to useAnalytics:
+    // If allTime is true OR no date chosen, use "all"
+    const dateParam = allTime || !selectedDate ? 'all' : selectedDate;
+
+    const { data, isLoading, error } = useAnalytics(dateParam);
 
     if (isLoading) {
       return <LoadingSpinner/>
@@ -67,28 +81,39 @@ export default function AnalyticsPage() {
       <div className="flex-1 flex justify-center">
         <div id="analytics-header" className="flex flex-col items-center">
           <h1 className='text-2xl font-bold'>Transaction Analytics Dashboard</h1>
-          <div className='flex gap-2 items-center my-2'>
-            <label>
-              Report Period:
+          {/* Date selector + All Time */}
+          <div className="flex gap-4 items-center mt-2">
+            <h1 className='font-semibold'>Report Period: </h1>
+            <label className="flex items-center space-x-2">
               <input
-                type="number"
-                value={timeValue}
-                onChange={e => setTimeValue(parseInt(e.target.value))}
-                className="border px-2 py-0.5 ml-2 w-16"
+                type="checkbox"
+                checked={allTime}
+                onChange={(e) => {
+                  setAllTime(e.target.checked);
+                  if (e.target.checked) {
+                    setSelectedDate('');
+                  }
+                }}
+                className="h-4 w-4"
+              />
+              <span className="text-gray-700">All-Time</span>
+            </label>
+            <h2 className='font-semibold'>OR</h2>
+            <label className="flex items-center space-x-2">
+              <span className="text-gray-700">Select Date:</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setAllTime(false);
+                }}
+                className="border px-2 py-0.5"
+                disabled={allTime}
               />
             </label>
-            <select
-              value={timeUnit}
-              onChange={e => setTimeUnit(e.target.value)}
-              className="border px-2 py-0.5"
-            >
-              <option value="hours">Hours</option>
-              <option value="days">Days</option>
-              <option value="weeks">Weeks</option>
-              <option value="months">Months</option>
-              <option value="years">Years</option>
-            </select>
           </div>
+
           <button 
             id="download-pdf-btn"
             className='px-4 mb-3 underline text-blue-500 cursor-pointer no-print'
@@ -123,13 +148,13 @@ export default function AnalyticsPage() {
       </div>
 
       {/* TODO:Uncomment when we make the amount distribution histogram data */}
-      {/* <div className='mt-8'>
+      <div className='mt-8'>
         <Histogram
           title="Transaction Amount Distribution"
           data={data.mergedTransactionAmountIntervals}
           stacked={true}
         />
-      </div> */}
+      </div>
 
       <div className='mt-8 chart-container charts-section'>
         <div className='grid gap-6 grid-cols-1 lg:grid-cols-2'>
