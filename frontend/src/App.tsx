@@ -7,31 +7,37 @@ import Login from './pages/Auth/Login';
 import Upload from './pages/Admin/upload';
 // import Dashboard from './pages/Admin/Dashboard';
 import AnalyticsDashboard from './pages/Public/analytics';
+import { ErrorBoundary } from './components/public/ErrorBoundary';
+import { TaskProvider } from './contexts/TaskContext';
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Layout>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Navigate to="/analytics" replace />} />
-            
-            {/* Admin Routes */}
-            <Route element={<RoleBasedRoute allowedRoles={['admin']} />}>
-              <Route path="/admin/upload" element={<Upload />} />
-              {/* <Route path="/admin/dashboard" element={<Dashboard />} /> */}
-            </Route>
-            
-            {/* Analytics - Available to all authenticated users */}
-            <Route element={<PrivateRoute />}>
-              <Route path="/analytics" element={<AnalyticsDashboard />} />
-            </Route>
-            
-            <Route path="/unauthorized" element={<div>Access Denied</div>} />
-          </Routes>
-        </Layout>
-      </BrowserRouter>
+      <TaskProvider>
+        <ErrorBoundary>
+          <BrowserRouter>
+            <Layout>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/" element={<Navigate to="/analytics" replace />} />
+                
+                {/* Admin Routes */}
+                <Route element={<RoleBasedRoute allowedRoles={['admin']} />}>
+                  <Route path="/admin/upload" element={<Upload />} />
+                  {/* <Route path="/admin/dashboard" element={<Dashboard />} /> */}
+                </Route>
+                
+                {/* Analytics - Available to all authenticated users */}
+                <Route element={<PrivateRoute />}>
+                  <Route path="/analytics" element={<AnalyticsDashboard />} />
+                </Route>
+                
+                <Route path="/unauthorized" element={<div>Access Denied</div>} />
+              </Routes>
+            </Layout>
+          </BrowserRouter>
+        </ErrorBoundary>
+      </TaskProvider>
     </AuthProvider>
   );
 }

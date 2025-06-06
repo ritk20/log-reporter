@@ -213,6 +213,6 @@ def combine_logs(logs):
     df["Token_id_before_transaction"] = df["Token_id_before_response"].apply(lambda x: eval(x) if isinstance(x, str) else x)
 
     # Drop unnecessary columns
-    df = df.drop(columns=["SenderOrgId", "ReceiverOrgId"], errors='ignore')
+    # df = df.drop(columns=["SenderOrgId", "ReceiverOrgId"], errors='ignore')
     df.dropna()
     return df

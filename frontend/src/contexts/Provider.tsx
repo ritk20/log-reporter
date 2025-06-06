@@ -2,19 +2,57 @@ import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import type { User } from '../types/auth';
+import { jwtDecode } from 'jwt-decode';
+
+interface JWTPayload {
+  exp: number;
+  sub: string;
+  role: string;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      // Validate token and set user
-      setUser({ id: '1', email: 'admin@example.com', role: 'admin' });
-    }
-    setIsLoading(false);
+    const validateToken = () => {
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const decoded = jwtDecode<JWTPayload>(token);
+        const currentTime = Date.now() / 1000;
+
+        if (decoded.exp < currentTime) {
+          // Token expired
+          localStorage.removeItem('authToken');
+          setUser(null);
+          window.location.href = '/login';
+        } else {
+          // Token valid
+          setUser({
+            email: decoded.sub,
+            role: decoded.role === "admin" ? "admin" : "viewer"
+          });
+        }
+      } catch (error) {
+        // Invalid token
+        localStorage.removeItem('authToken');
+        console.error(error)
+        setUser(null);
+      }
+      setIsLoading(false);
+    };
+
+    validateToken();
+    // Check token every minute
+    const interval = setInterval(validateToken, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const login = async (email: string, password: string) => {

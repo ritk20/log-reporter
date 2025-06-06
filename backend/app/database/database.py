@@ -1,4 +1,3 @@
-# from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError
 from app.core.config import settings
@@ -25,10 +24,12 @@ async def connect_to_mongo():
         
         database = client[settings.MONGODB_DB_NAME]
         collection = database[settings.MONGODB_COLLECTION_NAME]
+        token_coll = database[settings.MONGODB_TOKENS_COLLECTION_NAME]
         
         mongodb.client = client
         mongodb.database = database
         mongodb.collection = collection
+        mongodb.token_coll = token_coll
 
         create_indexes()
 
@@ -49,7 +50,21 @@ def create_indexes():
         if not mongodb.collection:
             raise RuntimeError("MongoDB collection is not initialized")
 
-        mongodb.collection.create_index("Msg_id", unique=True)
+        mongodb.collection.create_index("Transaction_Id", unique=True)
+        mongodb.collection.create_index([("Result_of_Transaction", 1)])
+        mongodb.collection.create_index([("Inputs.id", 1)], name="idx_inputToken")
+
+        # Create unique index on tokenId for duplicate prevention
+        mongodb.token_coll.create_index(
+            [("tokenId", 1)], 
+            unique=True, 
+            background=True
+        )
+        mongodb.token_coll.create_index(
+            [("timestamp", -1)], 
+            background=True
+        )
+
         logger.info("MongoDB indexes created successfully")
 
     except Exception as e:
@@ -60,3 +75,15 @@ def get_collection():
         logger.error("MongoDB collection not initialized")
         raise RuntimeError("Database connection not established")
     return mongodb.collection
+
+def get_tokens_collection():
+    if mongodb.token_coll is None:
+        logger.error("MongoDB tokens collection not initialized")
+        raise RuntimeError("Database connection not established")
+    return mongodb.token_coll
+
+def get_database_client():
+    if mongodb.client is None:
+        logger.error("MongoDB client not initialized")
+        raise RuntimeError("Database connection not established")
+    return mongodb.client

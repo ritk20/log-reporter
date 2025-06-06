@@ -1,6 +1,12 @@
 [
   {
     "tokenId": "abc123",
+    "firstSeen": "2025-04-23T10:00:00Z",
+    "lastSeen": "2025-04-23T10:40:00Z",
+    "count": 9,
+    "totalAmount": 22333,
+    "uniqueSenderOrgs": 4,
+    "uniqueReceiverOrgs": 5,
     "occurrences": [
       {
         "Transaction_Id": "TX1001",
@@ -69,6 +75,12 @@
   },
   {
     "tokenId": "abc124",
+    "firstSeen": "2025-04-23T10:00:00Z",
+    "lastSeen": "2025-04-23T10:40:00Z",
+    "count": 9,
+    "totalAmount": 22333,
+    "uniqueSenderOrgs": 4,
+    "uniqueReceiverOrgs": 5,
     "occurrences": [
       {
         "Transaction_Id": "TX2001",
@@ -88,6 +100,12 @@
   },
   {
     "tokenId": "abc125",
+    "firstSeen": "2025-04-23T10:00:00Z",
+    "lastSeen": "2025-04-23T10:40:00Z",
+    "count": 9,
+    "totalAmount": 22333,
+    "uniqueSenderOrgs": 4,
+    "uniqueReceiverOrgs": 5,
     "occurrences": [
       {
       "Transaction_Id": "TX3001",
@@ -107,6 +125,12 @@
     },
     {
     "tokenId": "abc126",
+    "firstSeen": "2025-04-23T10:00:00Z",
+    "lastSeen": "2025-04-23T10:40:00Z",
+    "count": 9,
+    "totalAmount": 22333,
+    "uniqueSenderOrgs": 4,
+    "uniqueReceiverOrgs": 5,
     "occurrences": [
       {
       "Transaction_Id": "TX4001",
@@ -126,6 +150,12 @@
     },
     {
     "tokenId": "abc127",
+    "firstSeen": "2025-04-23T10:00:00Z",
+    "lastSeen": "2025-04-23T10:40:00Z",
+    "count": 9,
+    "totalAmount": 22333,
+    "uniqueSenderOrgs": 4,
+    "uniqueReceiverOrgs": 5,
     "occurrences": [
       {
       "Transaction_Id": "TX5001",
@@ -145,6 +175,12 @@
     },
     {
     "tokenId": "abc128",
+    "firstSeen": "2025-04-23T10:00:00Z",
+    "lastSeen": "2025-04-23T10:40:00Z",
+    "count": 9,
+    "totalAmount": 22333,
+    "uniqueSenderOrgs": 4,
+    "uniqueReceiverOrgs": 5,
     "occurrences": [
       {
       "Transaction_Id": "TX6001",
@@ -164,6 +200,12 @@
     },
     {
     "tokenId": "abc129",
+    "firstSeen": "2025-04-23T10:00:00Z",
+    "lastSeen": "2025-04-23T10:40:00Z",
+    "count": 9,
+    "totalAmount": 22333,
+    "uniqueSenderOrgs": 4,
+    "uniqueReceiverOrgs": 5,
     "occurrences": [
       {
       "Transaction_Id": "TX7001",
@@ -183,6 +225,12 @@
     },
     {
     "tokenId": "abc130",
+    "firstSeen": "2025-04-23T10:00:00Z",
+    "lastSeen": "2025-04-23T10:40:00Z",
+    "count": 9,
+    "totalAmount": 22333,
+    "uniqueSenderOrgs": 4,
+    "uniqueReceiverOrgs": 5,
     "occurrences": [
       {
       "Transaction_Id": "TX8001",
@@ -202,6 +250,12 @@
     },
     {
     "tokenId": "abc131",
+    "firstSeen": "2025-04-23T10:00:00Z",
+    "lastSeen": "2025-04-23T10:40:00Z",
+    "count": 9,
+    "totalAmount": 22333,
+    "uniqueSenderOrgs": 4,
+    "uniqueReceiverOrgs": 5,
     "occurrences": [
       {
       "Transaction_Id": "TX9001",
@@ -221,6 +275,12 @@
     },
     {
     "tokenId": "abc132",
+    "firstSeen": "2025-04-23T10:00:00Z",
+    "lastSeen": "2025-04-23T10:40:00Z",
+    "count": 9,
+    "totalAmount": 22333,
+    "uniqueSenderOrgs": 4,
+    "uniqueReceiverOrgs": 5,
     "occurrences": [
       {
       "Transaction_Id": "TX10001",
@@ -240,6 +300,12 @@
     },
     {
     "tokenId": "abc133",
+    "firstSeen": "2025-04-23T10:00:00Z",
+    "lastSeen": "2025-04-23T10:40:00Z",
+    "count": 9,
+    "totalAmount": 22333,
+    "uniqueSenderOrgs": 4,
+    "uniqueReceiverOrgs": 5,
     "occurrences": [
       {
       "Transaction_Id": "TX11001",
@@ -259,6 +325,12 @@
     },
     {
     "tokenId": "abc134",
+    "firstSeen": "2025-04-23T10:00:00Z",
+    "lastSeen": "2025-04-23T10:40:00Z",
+    "count": 9,
+    "totalAmount": 22333,
+    "uniqueSenderOrgs": 4,
+    "uniqueReceiverOrgs": 5,
     "occurrences": [
       {
       "Transaction_Id": "TX12001",

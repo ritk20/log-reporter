@@ -14,7 +14,7 @@ export function Header() {
 
   return (
     <header className="bg-blue-600 text-white w-full shadow-lg">
-      <div className="container px-4">
+      <div className="px-4 w-[100%]">
         <div className="flex justify-between items-center h-16">
           <h1 className="text-xl font-bold">ABAS Analytics</h1>
           <nav className="flex space-x-4">
