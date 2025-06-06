@@ -3,12 +3,12 @@ from typing import Dict
 task_status: Dict[str, dict] = {}
 
 def create_task(task_id: str, user: str):
-    from datetime import datetime
+    from datetime import datetime, timezone
     task_status[task_id] = {
         "status": "processing",
         "user": user,
         "authenticated": True,
-        "auth_time": datetime.utcnow().isoformat()
+        "auth_time": datetime.now(timezone.utc).isoformat()
     }
 
 def update_task(task_id: str, data: dict):

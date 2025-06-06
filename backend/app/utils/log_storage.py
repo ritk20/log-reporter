@@ -106,7 +106,7 @@ class LogStorageService:
                             continue
                         
                         # Find existing token to collect duplicate info
-                        existing_token = tokens_collection.find_one({"tokenId": id})
+                        existing_token = tokens_collection.find_one({"tokenId": token_id})
                         if existing_token:
                             tokenIds.append(token_id)
                         

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { AuthContext } from '../contexts/AuthContext';
+import { AuthContext } from './AuthContext';
 import type { User } from '../types/auth';
 import { jwtDecode } from 'jwt-decode';
 
