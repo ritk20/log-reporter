@@ -127,6 +127,108 @@
     { "x": 4, "y": 1300.25 },
     { "x": 5, "y": 1550.50 }
   ],
+  "mergedTransactionAmountIntervals": [
+    {
+      "interval": "0-100",
+      "total": 15300,
+      "load": 5000,
+      "transfer": 8000,
+      "redeem": 2300,
+      "split": 4000,
+      "merge": 7000,
+      "issue": 4300
+    },
+    {
+      "interval": "101-200",
+      "total": 11200,
+      "load": 3000,
+      "transfer": 6000,
+      "redeem": 2200,
+      "split": 2000,
+      "merge": 7000,
+      "issue": 2200
+    },
+    {
+      "interval": "201-300",
+      "total": 11200,
+      "load": 3000,
+      "transfer": 6000,
+      "redeem": 2200,
+      "split": 2000,
+      "merge": 7000,
+      "issue": 2200
+    },
+    {
+      "interval": "401-500",
+      "total": 11200,
+      "load": 3000,
+      "transfer": 6000,
+      "redeem": 2200,
+      "split": 2000,
+      "merge": 7000,
+      "issue": 2200
+    },
+    {
+      "interval": "501-600",
+      "total": 11200,
+      "load": 3000,
+      "transfer": 6000,
+      "redeem": 2200,
+      "split": 2000,
+      "merge": 7000,
+      "issue": 2200
+    },
+    {
+      "interval": "601-700",
+      "total": 10500,
+      "load": 2800,
+      "transfer": 5700,
+      "redeem": 2000,
+      "split": 1800,
+      "merge": 6500,
+      "issue": 2200
+    },
+    {
+      "interval": "701-800",
+      "total": 9800,
+      "load": 2600,
+      "transfer": 5400,
+      "redeem": 1800,
+      "split": 1600,
+      "merge": 6000,
+      "issue": 2200
+    },
+    {
+      "interval": "801-900",
+      "total": 9200,
+      "load": 2400,
+      "transfer": 5100,
+      "redeem": 1700,
+      "split": 1400,
+      "merge": 5500,
+      "issue": 2200
+    },
+    {
+      "interval": "901-1000",
+      "total": 8600,
+      "load": 2200,
+      "transfer": 4800,
+      "redeem": 1600,
+      "split": 1200,
+      "merge": 5000,
+      "issue": 2200
+    },
+    {
+      "interval": "1001-1100",
+      "total": 8000,
+      "load": 2000,
+      "transfer": 4500,
+      "redeem": 1500,
+      "split": 1000,
+      "merge": 4500,
+      "issue": 2200
+    }
+  ],
   "duplicateTokens": [
     {
       "tokenId": "abc123",
