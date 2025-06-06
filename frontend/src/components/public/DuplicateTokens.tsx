@@ -1,33 +1,19 @@
 import React, { useState, useEffect } from 'react'
-
-interface DuplicateToken {
-  tokenId: string;
-  count: number;
-  firstSeen: string;
-  lastSeen: string;
-  totalAmount: number;
-  uniqueSenders: number;
-  uniqueReceivers: number;
-  occurrences: Array<{
-    Transaction_Id: string;
-    SenderOrgID: string;
-    ReceiverOrgID: string;
-    amount: number;
-    timestamp: string;
-    senderOrg?: string;
-    receiverOrg?: string;
-  }>;
-}
+// import duplicateData from '../../../public/duplicate.json'
+import type { DuplicateToken } from '../../types/data';
+import { LoadingSpinner } from './Loading';
 
 interface DuplicateTokensProps {
+  data?: DuplicateToken[];
   timeValue?: number;
   timeUnit?: string;
   pageSize?: number;
 }
 
-export default function DuplicateTokensAccordion({
-  timeValue = 7,
-  timeUnit = 'days',
+export default function DuplicateTokensTable({
+  data = [],
+  timeValue = 24,
+  timeUnit = 'hours',
   pageSize = 10
 }: DuplicateTokensProps) {
   const [DuplicateTokens, setDuplicateTokens] = useState<DuplicateToken[]>([])
@@ -38,38 +24,70 @@ export default function DuplicateTokensAccordion({
   const [selectedTimeValue, setSelectedTimeValue] = useState(timeValue);
   const [selectedTimeUnit, setSelectedTimeUnit] = useState(timeUnit);
 
-  const fetchDuplicateTokens = React.useCallback(async () => {
+  //TODO: uncomment this when you have the backend API ready
+  // const fetchDuplicateTokens = React.useCallback(async () => {
+  //   setLoading(true);
+  //   setError(null);
+    
+  //   try {
+  //     const response = await fetch(
+  //       `/api/duplicate-tokens?time_value=${selectedTimeValue}&time_unit=${selectedTimeUnit}`
+  //     );
+      
+  //     if (!response.ok) {
+  //       throw new Error('Failed to fetch duplicate tokens');
+  //     }
+      
+  //     const result = await response.json();
+      
+  //     if (result.success) {
+  //       setDuplicateTokens(result.data);
+  //     } else {
+  //       setError(result.error || 'Unknown error occurred');
+  //     }
+  //   } catch (err) {
+  //     setError(err instanceof Error ? err.message : 'An error occurred');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }, [selectedTimeValue, selectedTimeUnit]);
+
+  // useEffect(() => {
+  //   fetchDuplicateTokens();
+  // }, [fetchDuplicateTokens]);
+
+  // For now, we will use the static data from duplicate.json
+  const fetchDuplicateTokens = () => {
     setLoading(true);
     setError(null);
-    
-    try {
-      const response = await fetch(
-        `/api/duplicate-tokens?time_value=${selectedTimeValue}&time_unit=${selectedTimeUnit}`
-      );
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch duplicate tokens');
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        setDuplicateTokens(result.data);
-      } else {
-        setError(result.error || 'Unknown error occurred');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
+
+    if(data.length > 0) {
+      setDuplicateTokens(data);
       setLoading(false);
+      return;
     }
-  }, [selectedTimeValue, selectedTimeUnit]);
+    
+    // try {
+    //   // Simulate fetching data from the backend
+    //   const result = duplicateData as DuplicateToken[];
+      
+    //   if (result) {
+    //     setDuplicateTokens(result);
+    //   } else {
+    //     setError('No duplicate tokens found');
+    //   }
+    // } catch (err) {
+    //   setError(err instanceof Error ? err.message : 'An error occurred');
+    // } finally {
+    //   setLoading(false);
+    // }
+  };
 
   useEffect(() => {
     fetchDuplicateTokens();
-  }, [fetchDuplicateTokens]);
+  }, []);
 
-  const handleRefresh = () => {
+  const handleFilter = () => {
     fetchDuplicateTokens();
   };
 
@@ -89,23 +107,23 @@ export default function DuplicateTokensAccordion({
     setExpanded(prev => ({ ...prev, [tokenId]: !prev[tokenId] }))
 
   return (
-    <div className="p-4">
-      <div className="flex gap-2 items-center">
+    <div className="py-2">
+      <div className="flex items-center">
           <label>
-            Time Period: 
+            Time Period: Last
             <input
               type="number"
               value={selectedTimeValue}
               onChange={(e) => setSelectedTimeValue(parseInt(e.target.value))}
               min="1"
-              className="w-16 p-1 ml-1"
+              className="w-12 p-1 ml-1"
             />
           </label>
           
           <select
             value={selectedTimeUnit}
             onChange={(e) => setSelectedTimeUnit(e.target.value)}
-            className="p-1"
+            className="mr-2"
           >
             {timeUnits.map(unit => (
               <option key={unit.value} value={unit.value}>
@@ -115,13 +133,13 @@ export default function DuplicateTokensAccordion({
           </select>
           
             <button
-            onClick={handleRefresh}
-            className="bg-blue-600 text-white border-none px-4 py-2 rounded cursor-pointer hover:bg-blue-700 transition"
+            onClick={handleFilter}
+            className="bg-gray-400 text-white border-none px-3 py-1 rounded cursor-pointer hover:bg-gray-500 transition"
             >
-            Refresh
+            Filter
             </button>
         </div>
-      {loading && <div className="align-center p-5">Loading duplicate tokens...</div>}
+      {loading && <LoadingSpinner/>}
       {error && <div className="p-2">Error: {error}</div>}
 
       {!loading && !error && (
@@ -163,19 +181,19 @@ export default function DuplicateTokensAccordion({
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-800">{dt.count}</td>
                     <td className="px-4 py-2 text-sm text-gray-800">
-                      {new Date(dt.firstSeen).toLocaleString()}
+                      {new Date(dt.firstSeen ?? '').toLocaleString()}
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-800">
-                      {new Date(dt.lastSeen).toLocaleString()}
+                      {new Date(dt.lastSeen ?? '').toLocaleString()}
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-800">
-                      {dt.totalAmount.toFixed(2)}
+                      {dt.totalAmount !== undefined && dt.totalAmount !== null ? dt.totalAmount.toFixed(2) : ''}
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-800">
-                      {dt.uniqueSenders}
+                      {dt.uniqueSenderOrgs}
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-800">
-                      {dt.uniqueReceivers}
+                      {dt.uniqueReceiverOrgs}
                     </td>
                   </tr>
 

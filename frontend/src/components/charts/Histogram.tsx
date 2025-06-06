@@ -3,16 +3,16 @@ import ReactECharts from 'echarts-for-react';
 interface HistogramProps {
   title: string;
   data: Array<{
-    name: string;
+    interval: string;
     total: number;
-    LOAD: number;
-    TRANSFER: number;
-    REDEEM: number;
+    load: number;
+    transfer: number;
+    redeem: number;
   }>;
   stacked?: boolean;
 }
 
-export default function Histogram({ title, data, stacked = false }: HistogramProps) {
+export default function Histogram({ title, data, stacked = true }: HistogramProps) {
   const option = {
     title: { text: title, left: 'center' },
     tooltip: {
@@ -25,7 +25,7 @@ export default function Histogram({ title, data, stacked = false }: HistogramPro
     },
     xAxis: {
       type: 'category',
-      data: data.map(d => d.name),
+      data: data.map(d => d.interval),
       axisLabel: { rotate: 45 }
     },
     yAxis: {
@@ -37,19 +37,19 @@ export default function Histogram({ title, data, stacked = false }: HistogramPro
         name: 'LOAD',
         type: 'bar',
         stack: stacked ? 'total' : undefined,
-        data: data.map(d => d.LOAD)
+        data: data.map(d => d.load)
       },
       {
         name: 'TRANSFER',
         type: 'bar',
         stack: stacked ? 'total' : undefined,
-        data: data.map(d => d.TRANSFER)
+        data: data.map(d => d.transfer)
       },
       {
         name: 'REDEEM',
         type: 'bar',
         stack: stacked ? 'total' : undefined,
-        data: data.map(d => d.REDEEM)
+        data: data.map(d => d.redeem)
       }
     ]
   };
