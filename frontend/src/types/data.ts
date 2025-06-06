@@ -60,8 +60,19 @@ export type TxSummary = {
   total: number
   successRate: number
   averageProcessingTime: number
-  // medianProcessingTime: number
-  // stdDevProcessingTime: number
+  stdevProcessingTime: number
+  minProcessingTime: number
+  maxProcessingTime: number
+  percentile25ProcessingTime: number
+  percentile50ProcessingTime: number
+  percentile75ProcessingTime: number
+  averageTransactionAmount: number
+  stdevTransactionAmount: number
+  minTransactionAmount: number
+  maxTransactionAmount: number
+  percentile25TransactionAmount: number
+  percentile50TransactionAmount: number
+  percentile75TransactionAmount: number
   successes: Record<Tx['type'], Record<Tx['operation'], number>>  //successful type-op
   failures: Record<Tx['type'], Record<Tx['operation'], number>> //failed type-op
   operation: Record<Tx['operation'], number> //all operation types (redundant)
