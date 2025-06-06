@@ -1,9 +1,12 @@
 import { useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
+import { useTask } from '../../contexts/TaskContext';
 
 export default function Upload() {
   const {user} = useAuth();
+  const { setTask } = useTask();
+
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -52,49 +55,50 @@ export default function Upload() {
       
       // If task_id is returned, poll for status
       if (data.task_id) {
-        pollTaskStatus(data.task_id);
+        setTask({ taskId: data.task_id, status: "processing", error: null });
       }
 
     } catch (err) {
       setMessage(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setTask({ taskId: null, status: "failed", error: err instanceof Error ? err.message : 'Unknown error' });
     }
 };
 
 // Add polling function for task status
-const pollTaskStatus = async (taskId: string) => {
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
+// const pollTaskStatus = async (taskId: string) => {
+//     const token = localStorage.getItem('authToken');
+//     if (!token) return;
 
-    const checkStatus = async () => {
-      try {
-        const response = await fetch(`http://localhost:8000/api/upload/task/${taskId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        const data = await response.json();
+//     const checkStatus = async () => {
+//       try {
+//         const response = await fetch(`http://localhost:8000/api/upload/task/${taskId}`, {
+//           headers: {
+//             'Authorization': `Bearer ${token}`
+//           }
+//         });
+//         const data = await response.json();
         
-        if (data.status === 'completed') {
-          setMessage('File processed successfully!');
-          return true;
-        } else if (data.status === 'failed') {
-          setMessage(`Processing failed: ${data.error || 'Unknown error'}`);
-          return true;
-        }
-        return false;
-      } catch (err) {
-        setMessage('Error checking status');
-        console.error(err);
-        return false; 
-      }
-    };
+//         if (data.status === 'completed') {
+//           setMessage('File processed successfully!');
+//           return true;
+//         } else if (data.status === 'failed') {
+//           setMessage(`Processing failed: ${data.error || 'Unknown error'}`);
+//           return true;
+//         }
+//         return false;
+//       } catch (err) {
+//         setMessage('Error checking status');
+//         console.error(err);
+//         return false; 
+//       }
+//     };
 
-    // Poll every 2 seconds until complete
-    const poll = setInterval(async () => {
-      const isDone = await checkStatus();
-      if (isDone) clearInterval(poll);
-    }, 2000);
-};
+//     // Poll every 2 seconds until complete
+//     const poll = setInterval(async () => {
+//       const isDone = await checkStatus();
+//       if (isDone) clearInterval(poll);
+//     }, 2000);
+// };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full">
