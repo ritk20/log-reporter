@@ -6,9 +6,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 class MongoDB:
-    client: MongoClient
+    client: MongoClient = None
     database = None
     collection = None
+    token_coll = None
 
 mongodb = MongoDB()
 
@@ -24,15 +25,10 @@ async def connect_to_mongo():
         
         mongodb.client = client
         mongodb.database = client[settings.MONGODB_DB_NAME]
-        mongodb.collection = mongodb.database[settings.MONGODB_COLLECTION_NAME]
-        mongodb.token_coll = mongodb.database[settings.MONGODB_TOKENS_COLLECTION_NAME]
-      
-        
-        await create_time_series_collection()  # Create time series collection
-        
-        if verify_time_series_collection():
-            logger.info("Confirmed Master is a time series collection")
-        
+
+        # Check if collection exists only ONCE and create if needed
+        initialize_collections()
+
         logger.info(f"Connected to MongoDB database: {settings.MONGODB_DB_NAME}")
         return mongodb.collection
 
@@ -46,52 +42,41 @@ async def close_mongo_connection():
         logger.info("Disconnected from MongoDB")
 
 
-async def create_time_series_collection():
+def initialize_collections():
+    """Ensure collections are initialized and created if they don't exist."""
     try:
-        collection_names = mongodb.database.list_collection_names()
+        db = mongodb.database
+        existing_collections = db.list_collection_names()
 
-        # Collection already exists
-        if settings.MONGODB_COLLECTION_NAME in collection_names:
-            collection = mongodb.database[settings.MONGODB_COLLECTION_NAME]
-            collection_info = collection.options()
+        # Handle Master (time series) collection
+        if settings.MONGODB_COLLECTION_NAME not in existing_collections:
+            logger.info(f"Creating time-series collection '{settings.MONGODB_COLLECTION_NAME}'")
+            db.create_collection(
+                settings.MONGODB_COLLECTION_NAME,
+                timeseries={
+                    "timeField": "Request_timestamp",
+                    "metaField": "Msg_id",
+                    "granularity": "seconds"
+                }
+            )
+            logger.info("Created time-series collection.")
+        else:
+            logger.info(f"Using existing collection '{settings.MONGODB_COLLECTION_NAME}'")
 
-            # It's already a time series collection — no need to recreate
-            if "timeseries" in collection_info:
-                logger.info(f"Collection '{settings.MONGODB_COLLECTION_NAME}' already exists as a time series collection. Skipping creation.")
-                return
-
-            # If it's not a time series collection — drop and recreate
-            logger.warning(f"Existing collection '{settings.MONGODB_COLLECTION_NAME}' is not a time series collection. Dropping it.")
-            mongodb.database.drop_collection(settings.MONGODB_COLLECTION_NAME)
-            logger.info(f"Dropped collection '{settings.MONGODB_COLLECTION_NAME}'")
-
-        # Now create time series collection
-        mongodb.database.create_collection(
-            settings.MONGODB_COLLECTION_NAME,
-            timeseries={
-                "timeField": "Request_timestamp",
-                "metaField": "Msg_id",
-                "granularity": "seconds"
-            },
-            expireAfterSeconds=2592000
-        )
-        logger.info(f"Time series collection '{settings.MONGODB_COLLECTION_NAME}' created")
-
-        # Update reference
-        mongodb.collection = mongodb.database[settings.MONGODB_COLLECTION_NAME]
-
-        # Index on Msg_id
+        mongodb.collection = db[settings.MONGODB_COLLECTION_NAME]
         mongodb.collection.create_index([("Msg_id", 1)], background=True)
-        logger.info("Index on Msg_id created")
-    
-        # Ensure token_coll reference and indexes
-        mongodb.token_coll = mongodb.database[settings.MONGODB_TOKENS_COLLECTION_NAME]
+
+        # Handle Token collection
+        if settings.MONGODB_TOKENS_COLLECTION_NAME not in existing_collections:
+            logger.info(f"Creating token collection '{settings.MONGODB_TOKENS_COLLECTION_NAME}'")
+            db.create_collection(settings.MONGODB_TOKENS_COLLECTION_NAME)
+
+        mongodb.token_coll = db[settings.MONGODB_TOKENS_COLLECTION_NAME]
         mongodb.token_coll.create_index([("tokenId", 1)], unique=True, background=True)
         mongodb.token_coll.create_index([("timestamp", -1)], background=True)
-        logger.info("Token collection indexes created")
-    
+
     except Exception as e:
-        logger.error(f"Error creating time series collection: {str(e)}")
+        logger.error(f"Collection initialization failed: {str(e)}")
         raise
 
 def get_collection():
