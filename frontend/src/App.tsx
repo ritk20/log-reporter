@@ -27,12 +27,14 @@ function App() {
                   {/* <Route path="/admin/dashboard" element={<Dashboard />} /> */}
                 </Route>
                 
+                <Route path="*" element={<Navigate to="/unauthorized" replace />} />
+                
                 {/* Analytics - Available to all authenticated users */}
                 <Route element={<PrivateRoute />}>
                   <Route path="/analytics" element={<AnalyticsDashboard />} />
                 </Route>
                 
-                <Route path="/unauthorized" element={<div>Access Denied</div>} />
+                <Route path="/unauthorized" element={<div className='text-red-500 flex justify-center text-2xl font-semibold'>Access Denied</div>} />
               </Routes>
             </Layout>
           </BrowserRouter>
