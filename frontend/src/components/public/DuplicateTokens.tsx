@@ -12,8 +12,6 @@ interface DuplicateTokensProps {
 
 export default function DuplicateTokensTable({
   data = [],
-  timeValue = 24,
-  timeUnit = 'hours',
   pageSize = 10
 }: DuplicateTokensProps) {
   const [DuplicateTokens, setDuplicateTokens] = useState<DuplicateToken[]>([])
@@ -21,8 +19,6 @@ export default function DuplicateTokensTable({
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(0)
   const [error, setError] = useState<string | null>(null);
-  const [selectedTimeValue, setSelectedTimeValue] = useState(timeValue);
-  const [selectedTimeUnit, setSelectedTimeUnit] = useState(timeUnit);
 
   //TODO: uncomment this when you have the backend API ready
   // const fetchDuplicateTokens = React.useCallback(async () => {
@@ -66,38 +62,11 @@ export default function DuplicateTokensTable({
       setLoading(false);
       return;
     }
-    
-    // try {
-    //   // Simulate fetching data from the backend
-    //   const result = duplicateData as DuplicateToken[];
-      
-    //   if (result) {
-    //     setDuplicateTokens(result);
-    //   } else {
-    //     setError('No duplicate tokens found');
-    //   }
-    // } catch (err) {
-    //   setError(err instanceof Error ? err.message : 'An error occurred');
-    // } finally {
-    //   setLoading(false);
-    // }
   };
 
   useEffect(() => {
     fetchDuplicateTokens();
   }, []);
-
-  const handleFilter = () => {
-    fetchDuplicateTokens();
-  };
-
-  const timeUnits = [
-    { value: 'hours', label: 'Hours' },
-    { value: 'days', label: 'Days' },
-    { value: 'weeks', label: 'Weeks' },
-    { value: 'months', label: 'Months' },
-    { value: 'years', label: 'Years' }
-  ];
 
   // Pagination
   const pageCount = Math.ceil(DuplicateTokens.length / pageSize)
@@ -108,37 +77,7 @@ export default function DuplicateTokensTable({
 
   return (
     <div className="py-2">
-      <div className="flex items-center">
-          <label>
-            Time Period: Last
-            <input
-              type="number"
-              value={selectedTimeValue}
-              onChange={(e) => setSelectedTimeValue(parseInt(e.target.value))}
-              min="1"
-              className="w-12 p-1 ml-1"
-            />
-          </label>
-          
-          <select
-            value={selectedTimeUnit}
-            onChange={(e) => setSelectedTimeUnit(e.target.value)}
-            className="mr-2"
-          >
-            {timeUnits.map(unit => (
-              <option key={unit.value} value={unit.value}>
-                {unit.label}
-              </option>
-            ))}
-          </select>
-          
-            <button
-            onClick={handleFilter}
-            className="bg-gray-400 text-white border-none px-3 py-1 rounded cursor-pointer hover:bg-gray-500 transition"
-            >
-            Filter
-            </button>
-        </div>
+      <h1 className='flex justify-center font-semibold text-xl mb-2'>Duplicate Tokens</h1>
       {loading && <LoadingSpinner/>}
       {error && <div className="p-2">Error: {error}</div>}
 
