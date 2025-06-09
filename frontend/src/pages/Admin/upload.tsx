@@ -1,141 +1,124 @@
 import { useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
+import { useTask } from '../../hooks/useTask';
 
 export default function Upload() {
-  const {user} = useAuth();
+  const { user } = useAuth();
+  const { setTask } = useTask();
+
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (user.role !== 'admin') {
-    return <Navigate to="/unauthorized" replace />;
-  }
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'admin') return <Navigate to="/unauthorized" replace />;
 
   const handleUpload = async () => {
     if (!file) {
-      setMessage("Please select a file");
+      setMessage('Please select a file');
       return;
     }
+
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append('file', file);
 
     try {
-      // Get the auth token from localStorage
       const token = localStorage.getItem('authToken');
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
+      if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch("http://localhost:8000/api/upload/upload", {
-        method: "POST",
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
+      setTask({ 
+        taskId: null, 
+        status: 'uploading',
+        error: null,
+        progress: { current: 0, total: 100, message: 'Uploading file...' }
       });
-      
-      if (response.status === 401) {
-        throw new Error('Authentication failed');
-      }
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+
+      const response = await fetch('http://localhost:8000/api/upload/upload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (response.status === 401) throw new Error('Authentication failed');
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
       const data = await response.json();
-      setMessage(data.message || "Uploaded successfully");
-      
-      // If task_id is returned, poll for status
+      setMessage(data.message || 'Upload accepted');
+
       if (data.task_id) {
-        pollTaskStatus(data.task_id);
+        setTask({ 
+          taskId: data.task_id, 
+          status: 'processing',
+          error: null,
+          progress: { current: 0, total: 100, message: 'Starting processing...' }
+        });
       }
 
+      // Reset state for next file
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       setMessage(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setTask({
+        taskId: null,
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'Unknown error',
+        progress: null
+      });
     }
-};
-
-// Add polling function for task status
-const pollTaskStatus = async (taskId: string) => {
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
-
-    const checkStatus = async () => {
-      try {
-        const response = await fetch(`http://localhost:8000/api/upload/task/${taskId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        const data = await response.json();
-        
-        if (data.status === 'completed') {
-          setMessage('File processed successfully!');
-          return true;
-        } else if (data.status === 'failed') {
-          setMessage(`Processing failed: ${data.error || 'Unknown error'}`);
-          return true;
-        }
-        return false;
-      } catch (err) {
-        setMessage('Error checking status');
-        console.error(err);
-        return false; 
-      }
-    };
-
-    // Poll every 2 seconds until complete
-    const poll = setInterval(async () => {
-      const isDone = await checkStatus();
-      if (isDone) clearInterval(poll);
-    }, 2000);
-};
+  };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-full">
-      <div className="p-2">
-        <h1 className="text-3xl font-bold text-center text-gray-800">
+    <div className="bg-gray-50 flex items-center justify-center">
+      {/* Card Container */}
+      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm transform transition-all hover:shadow-2xl hover:-translate-y-1">
+        <h1 className="text-2xl font-bold text-center text-gray-800 mb-8">
           Logs Uploader
         </h1>
-      </div>
-      
-      <div className="m-4 flex flex-col align-flex-start max-w-md">
+
+        {/* Hidden native file input */}
         <input
           ref={fileInputRef}
           type="file"
-          accept='.zip, .tar, .gz, .log'
-          className="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          accept=".zip,.tar,.gz,.log"
+          className="hidden"
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-            if (!e.target.files || e.target.files.length === 0) {
-              setFile(null);
-              setMessage('No file selected');
-              return;
-            }
-            const file = e.target.files[0];
-              setFile(file);
-              setMessage('');
+            const selectedFile = e.target.files?.[0] || null;
+            setFile(selectedFile);
+            setMessage('');
           }}
         />
-      </div>
-      <button 
-          onClick={handleUpload} 
-          className="py-3 px-4 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 transition duration-200 ease-in-out transform hover:scale-105"
+
+        {/* Choose File Button */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full flex items-center justify-center px-4 py-2 border-2 border-blue-600 text-blue-600 rounded-lg mb-6 transition-all hover:bg-blue-50 hover:scale-105 active:scale-95 focus:outline-none"
+        >
+          {file ? file.name : 'Choose File'}
+        </button>
+
+        {/* Upload Button */}
+        <button
+          onClick={handleUpload}
+          className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg transition-all hover:bg-blue-700 hover:scale-105 active:scale-95 focus:outline-none"
         >
           UPLOAD FILE
-      </button>
+        </button>
 
-      {message && (
-        <p className={`mt-4 text-center ${
-          message.includes('failed') ? 'text-red-600' : 'text-green-600'
-        } font-medium`}>
-          {message}
-        </p>
-      )}
+        {/* Message */}
+        {message && (
+          <p
+            className={`mt-6 text-center font-medium ${
+              message.toLowerCase().includes('failed') ? 'text-red-600' : 'text-green-600'
+            }`}
+          >
+            {message}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

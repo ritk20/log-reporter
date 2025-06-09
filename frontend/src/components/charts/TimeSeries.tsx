@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import ReactECharts from 'echarts-for-react'
-import type { Tx } from '../../pages/Public/analytics'
+import type { Tx } from '../../types/data'
 
 
 interface TemporalDashboardProps {

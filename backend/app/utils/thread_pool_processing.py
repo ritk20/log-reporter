@@ -12,10 +12,3 @@ def run_in_thread_pool(func, *args, **kwargs):
     :return: Future object representing the execution of the function.
     """
     return EXECUTOR.submit(func, *args, **kwargs)
-
-
-
-
-
-
-

@@ -258,8 +258,7 @@ def aggregate_daily_summary(collection: Collection, daily_collection: Collection
         {"$set": summary_doc},
         upsert=True
     )
-
-    return summary_doc["summary"]
+    return 
 
 def aggregate_overall_summary(daily_collection: Collection, overall_collection: Collection):
 
@@ -335,4 +334,4 @@ def aggregate_overall_summary(daily_collection: Collection, overall_collection: 
         upsert=True
     )
 
-    return overall_summary_doc
+    return 

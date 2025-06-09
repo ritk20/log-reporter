@@ -1,51 +1,54 @@
 # app/api/analytics.py
 import logging
-
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pymongo import MongoClient
-from app.api.auth import authenticate_user
 from app.core.config import settings
 from app.api.analytics_service import aggregate_daily_summary, aggregate_overall_summary
-from app.database.database import get_temptoken_collection
-from app.utils.log_storage import convert_objectid  # Add this import at the top
-
-
+from app.database.database import get_temptoken_collection 
+import datetime
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 client = MongoClient(settings.MONGODB_URL)
-db = client["logs"]
-collection = db["Temp"]
-daily_collection = db["Daily_Transaction_Summary"]
-overall_collection = db["Transaction_summary"]
-
-security = HTTPBasic()
-
-def verify_user(credentials: HTTPBasicCredentials = Depends(security)):
-    user = authenticate_user(credentials.username, credentials.password)
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return user
+db = client[settings.MONGODB_DB_NAME]
+tempcollection = db[settings.MONGODB_TEMP_COLLECTION_NAME]
+daily_collection = db[settings.MONGODB_DAILY_SUMM_COLLECTION_NAME]
+overall_collection = db[settings.MONGODB_SUMM_COLLECTION_NAME]
 
 
-
-@router.get("/summary")
-async def analytics_summary(authenticated: bool = Depends(verify_user)):
+def generate_summary_report():
     try:
-        temptoken_collection = get_temptoken_collection() 
-        daily_summary = aggregate_daily_summary(collection, daily_collection)
-        overall_summary = aggregate_overall_summary(daily_collection, overall_collection)
-        # You can return both or just daily_summary depending on frontend need
-        return {
-            "daily_summary": daily_summary,
-            "overall_summary": overall_summary,
-            "duplicate_tokens": convert_objectid(list(temptoken_collection.find()))
-        }
+        temptoken_collection = get_temptoken_collection()
+        daily_summary = aggregate_daily_summary(tempcollection, daily_collection)
+        overall_summary = aggregate_overall_summary(daily_collection, overall_collection) 
     except Exception as e:
-        logging.error(f"Error in analytics_summary: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        logging.error(f"Error in generate_summary_report: {e}", exc_info=True)
+        raise
+
+@router.get("/analytics", tags=["Analytics"])
+async def get_analytics(date: str = Query("all", description="YYYY-MM-DD or 'all'")):
+    """
+    If date == 'all': return the single doc from overall_summary.
+    Otherwise parse date as YYYY-MM-DD and return that day's summary from daily_summary.
+    """
+
+    # 1) All-Time
+    if date.lower() == "all":
+        doc = await overall_collection.find_one({"_id": "summary"}, {"_id": 0})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Overall summary not found")
+        return doc
+
+    # 2) Daily
+    try:
+        # Parse string "YYYY-MM-DD" into a datetime at midnight UTC
+        dt = datetime.strptime(date, "%Y-%m-%d")
+        day_start = datetime(dt.year, dt.month, dt.day)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Date must be 'YYYY-MM-DD' or 'all'")
+
+    # Query daily_summary
+    doc = await daily_collection.find_one({"date": day_start}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail=f"No data for {date}")
+    return doc
