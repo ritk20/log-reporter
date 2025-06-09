@@ -8,14 +8,15 @@ from app.api.auth import authenticate_user
 from app.core.config import settings
 from app.api.analytics_service import aggregate_daily_summary, aggregate_overall_summary
 from app.utils.log_storage import LogStorageService
+import datetime
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 client = MongoClient(settings.MONGODB_URL)
 db = client["logs"]
 collection = db["transaction_logs"]
-daily_collection = db["Daily_Transaction_Summary"]
-overall_collection = db["overall_summary"]
+daily_collection = db[settings.MONGODB_DAILY_SUMM_COLLECTION_NAME]
+overall_collection = db[settings.MONGODB_SUMM_COLLECTION_NAME]
 
 security = HTTPBasic()
 
@@ -53,7 +54,7 @@ async def get_analytics(date: str = Query("all", description="YYYY-MM-DD or 'all
 
     # 1) All-Time
     if date.lower() == "all":
-        doc = await overall_coll.find_one({"_id": "summary"}, {"_id": 0})
+        doc = await overall_collection.find_one({"_id": "summary"}, {"_id": 0})
         if not doc:
             raise HTTPException(status_code=404, detail="Overall summary not found")
         return doc
@@ -67,7 +68,7 @@ async def get_analytics(date: str = Query("all", description="YYYY-MM-DD or 'all
         raise HTTPException(status_code=400, detail="Date must be 'YYYY-MM-DD' or 'all'")
 
     # Query daily_summary
-    doc = await daily_coll.find_one({"date": day_start}, {"_id": 0})
+    doc = await daily_collection.find_one({"date": day_start}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail=f"No data for {date}")
     return doc

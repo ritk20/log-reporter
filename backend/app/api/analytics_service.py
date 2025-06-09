@@ -3,47 +3,25 @@ import math
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from pymongo.collection import Collection
-from app.utils.log_storage import LogStorageService
 
-min_time = LogStorageService.min_time
-max_time = LogStorageService.max_time
 
-# Convert times to ISO format for consistency
-start_time_iso = min_time.isoformat() if hasattr(min_time, "isoformat") else min_time
-end_time_iso = max_time.isoformat() if hasattr(max_time, "isoformat") else max_time
-
-def get_type_counts(collection: Collection, min_time: datetime, max_time: datetime):
-    pipeline = [
-        {"$match": {"Request_timestamp": {"$gte": min_time, "$lte": max_time}}},
-        {"$group": {"_id": "$Type_Of_Transaction", "count": {"$sum": 1}}}
-        ]
+def get_type_counts(collection: Collection):
+    pipeline = [{"$group": {"_id": "$Type_Of_Transaction", "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
     return Counter({res["_id"]: res["count"] for res in results if res["_id"]})
 
-def get_operation_counts(collection: Collection, min_time: datetime, max_time: datetime):
-    # Add a $match stage to filter by time range
-    pipeline = [
-        {"$match": {"Request_timestamp": {"$gte": min_time, "$lte": max_time}}},
-        {"$group": {"_id": "$Operation", "count": {"$sum": 1}}}
-    ]
+def get_operation_counts(collection: Collection):
+    pipeline = [{"$group": {"_id": "$Operation", "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
     return Counter({res["_id"]: res["count"] for res in results if res["_id"]})
 
-def get_error_counts(collection: Collection, min_time: datetime, max_time: datetime):
-    # Add a $match stage to filter by time range
-    pipeline = [
-        {"$match": {"Request_timestamp": {"$gte": min_time, "$lte": max_time}}},
-        {"$group": {"_id": "$ErrorCode", "count": {"$sum": 1}}}
-    ]
+def get_error_counts(collection: Collection):
+    pipeline = [{"$group": {"_id": "$ErrorCode", "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
     return Counter({res["_id"]: res["count"] for res in results if res["_id"]})
 
-def get_result_counts(collection: Collection, min_time: datetime, max_time: datetime):
-    # Add a $match stage to filter by time range
-    pipeline = [
-        {"$match": {"Request_timestamp": {"$gte": min_time, "$lte": max_time}}},
-        {"$group": {"_id": "$Result_of_Transaction", "count": {"$sum": 1}}}
-    ]
+def get_result_counts(collection: Collection):
+    pipeline = [{"$group": {"_id": "$Result_of_Transaction", "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
     counts = Counter()
     for res in results:
@@ -57,19 +35,14 @@ def get_result_counts(collection: Collection, min_time: datetime, max_time: date
         counts[key] += res["count"]
     return counts
 
-
-def get_amount_buckets(collection: Collection, min_time: datetime, max_time: datetime, n_intervals=30):
-    # Add a $match stage to filter by time range
-    pipeline = [
-        {"$match": {"Request_timestamp": {"$gte": min_time, "$lte": max_time}}},
-        {
-            "$group": {
-                "_id": None,
-                "minAmt": {"$min": "$input_amount"},
-                "maxAmt": {"$max": "$input_amount"},
-            }
+def get_amount_buckets(collection: Collection, n_intervals=30):
+    pipeline = [{
+        "$group": {
+            "_id": None,
+            "minAmt": {"$min": "$input_amount"},
+            "maxAmt": {"$max": "$input_amount"},
         }
-    ]
+    }]
     res = list(collection.aggregate(pipeline))
     if not res or res[0]["minAmt"] is None or res[0]["maxAmt"] is None:
         min_amt, max_amt = 0, 10000
@@ -93,9 +66,7 @@ def get_amount_buckets(collection: Collection, min_time: datetime, max_time: dat
             "REDEEM": 0
         })
 
-    cursor = collection.find({
-        "Request_timestamp": {"$gte": min_time, "$lte": max_time}
-    }, {
+    cursor = collection.find({}, {
         "input_amount": 1,
         "Type_Of_Transaction": 1,
         "Result_of_Transaction": 1,
@@ -154,13 +125,8 @@ def get_cross_type_operation(collection: Collection):
         o = r["_id"].get("operation", "UNKNOWN")
         cross[t][o] = r["count"]
     return cross
-
-def get_cross_type_error(collection: Collection, min_time: datetime, max_time: datetime):
-    # Add a $match stage to filter by time range
-    pipeline = [
-        {"$match": {"Request_timestamp": {"$gte": min_time, "$lte": max_time}}},
-        {"$group": {"_id": {"type": "$Type_Of_Transaction", "error": "$ErrorCode"}, "count": {"$sum": 1}}}
-    ]
+def get_cross_type_error(collection: Collection):
+    pipeline = [{"$group": {"_id": {"type": "$Type_Of_Transaction", "error": "$ErrorCode"}, "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
     cross = defaultdict(dict)
     for r in results:
@@ -169,13 +135,8 @@ def get_cross_type_error(collection: Collection, min_time: datetime, max_time: d
         cross[t][e] = r["count"]
     return cross
 
-
-def get_cross_operation_error(collection: Collection, min_time: datetime, max_time: datetime):
-    # Add a $match stage to filter by time range
-    pipeline = [
-        {"$match": {"Request_timestamp": {"$gte": min_time, "$lte": max_time}}},
-        {"$group": {"_id": {"operation": "$Operation", "error": "$ErrorCode"}, "count": {"$sum": 1}}}
-    ]
+def get_cross_operation_error(collection: Collection):
+    pipeline = [{"$group": {"_id": {"operation": "$Operation", "error": "$ErrorCode"}, "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
     cross = defaultdict(dict)
     for r in results:
@@ -184,36 +145,26 @@ def get_cross_operation_error(collection: Collection, min_time: datetime, max_ti
         cross[o][e] = r["count"]
     return cross
 
-
-def get_processing_time_by_inputs(collection: Collection, min_time: datetime, max_time: datetime):
-    # Add a $match stage to filter by time range
-    pipeline = [
-        {"$match": {"Request_timestamp": {"$gte": min_time, "$lte": max_time}}},
-        {"$group": {"_id": "$NumberOfInputs", "avgTime": {"$avg": "$Time_to_Transaction_secs"}}}
-    ]
+def get_processing_time_by_inputs(collection: Collection):
+    pipeline = [{"$group": {"_id": "$NumberOfInputs", "avgTime": {"$avg": "$Time_to_Transaction_secs"}}}]
     results = list(collection.aggregate(pipeline))
     return [{"x": r["_id"], "y": r["avgTime"]} for r in results]
 
-def get_processing_time_by_outputs(collection: Collection, min_time: datetime, max_time: datetime):
-    # Add a $match stage to filter by time range
-    pipeline = [
-        {"$match": {"Request_timestamp": {"$gte": min_time, "$lte": max_time}}},
-        {"$group": {"_id": "$NumberOfOutputs", "avgTime": {"$avg": "$Time_to_Transaction_secs"}}}
-    ]
+def get_processing_time_by_outputs(collection: Collection):
+    pipeline = [{"$group": {"_id": "$NumberOfOutputs", "avgTime": {"$avg": "$Time_to_Transaction_secs"}}}]
     results = list(collection.aggregate(pipeline))
     return [{"x": r["_id"], "y": r["avgTime"]} for r in results]
 
-def get_5min_interval_stats(collection: Collection, min_time: datetime, max_time: datetime):
+def get_5min_interval_stats(collection: Collection):
+    min_time_doc = collection.find_one({}, sort=[("Request_timestamp", 1)], projection={"Request_timestamp": 1})
+    if not min_time_doc:
+        return []
+    min_time = min_time_doc["Request_timestamp"]
     if isinstance(min_time, str):
         min_time = datetime.fromisoformat(min_time.replace("Z", "+00:00"))
-    if isinstance(max_time, str):
-        max_time = datetime.fromisoformat(max_time.replace("Z", "+00:00"))
-        
     interval_duration = timedelta(minutes=5)
 
-    cursor = collection.find({
-        "Request_timestamp": {"$gte": min_time, "$lte": max_time}
-    }, projection=[
+    cursor = collection.find({}, projection=[
         "Request_timestamp", "Result_of_Transaction", "input_amount", "Time_to_Transaction_secs", "ErrorCode"
     ])
 
@@ -252,22 +203,38 @@ def get_5min_interval_stats(collection: Collection, min_time: datetime, max_time
         })
     return interval_stats
 
-def aggregate_daily_summary(collection: Collection, daily_collection: Collection, min_time: datetime, max_time: datetime):
-    type_counts = get_type_counts(collection, min_time, max_time)
-    operation_counts = get_operation_counts(collection, min_time, max_time)
-    error_counts = get_error_counts(collection, min_time, max_time)
-    result_counts = get_result_counts(collection, min_time, max_time)
-    bucket_docs, total_transactions, success_rate, avg_processing_time = get_amount_buckets(collection, min_time, max_time)
+def aggregate_daily_summary(collection: Collection, daily_collection: Collection):
+    
+    type_counts = get_type_counts(collection)
+    operation_counts = get_operation_counts(collection)
+    error_counts = get_error_counts(collection)
+    result_counts = get_result_counts(collection)
+    bucket_docs, total_transactions, success_rate, avg_processing_time = get_amount_buckets(collection)
     cross_type_op = get_cross_type_operation(collection)
     cross_type_error = get_cross_type_error(collection)
     cross_op_error = get_cross_operation_error(collection)
     processing_time_by_inputs = get_processing_time_by_inputs(collection)
     processing_time_by_outputs = get_processing_time_by_outputs(collection)
-    interval_stats = get_5min_interval_stats(collection, min_time, max_time)
+    interval_stats = get_5min_interval_stats(collection)
+    
+    # Get min and max Request_timestamp directly (assumed always valid ISO datetime or datetime obj)
+    minmax_time_result = list(collection.aggregate([
+        {
+            "$group": {
+                "_id": None,
+                "minTime": {"$min": "$Request_timestamp"},
+                "maxTime": {"$max": "$Request_timestamp"},
+            }
+        }
+    ]))
+    min_time_val = minmax_time_result[0]["minTime"]
+    max_time_val = minmax_time_result[0]["maxTime"]
+    start_time_iso = min_time_val.isoformat() if hasattr(min_time_val, "isoformat") else min_time_val
+    end_time_iso = max_time_val.isoformat() if hasattr(max_time_val, "isoformat") else max_time_val
 
     summary_doc = {
-        "start_time": min_time.isoformat(),
-        "end_time": max_time.isoformat(),
+        "start_time": start_time_iso,
+        "end_time": end_time_iso,
         "summary": {
             "type": [{k: v} for k, v in type_counts.items()],
             "operation": [{k: v} for k, v in operation_counts.items()],
@@ -287,7 +254,7 @@ def aggregate_daily_summary(collection: Collection, daily_collection: Collection
     }
 
     daily_collection.update_one(
-        {"date": min_time.strftime('%Y-%m-%d')},
+        {"date": start_time_iso[:10]},
         {"$set": summary_doc},
         upsert=True
     )
