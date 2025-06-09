@@ -55,7 +55,6 @@ def process_zip_file(task_id: str, file_path: str, user_info: dict):
                     all_parsed_logs.extend(logs)
             except Exception as e:
                 logger.warning(f"Failed to parse file {file}: {e}")
-
         if all_parsed_logs:
             update_task(task_id, {
                 "status": "processing_records",
