@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTask } from "../../hooks/useTask";
 
 export default function UploadWidget() {
   const { task, setTask, clearTask } = useTask();
   const { taskId, status, error, progress } = task;
+  const [latestDate, setLatestDate] = useState<string | null>(null);
 
   // Polling effect: once taskId exists & status is 'processing'
   useEffect(() => {
@@ -47,6 +48,28 @@ export default function UploadWidget() {
     const interval = setInterval(checkStatus, 500);
     return () => clearInterval(interval);
   }, [taskId, status, setTask, clearTask]);
+
+  // Add effect to fetch latest date when upload completes
+  useEffect(() => {
+    if (status === "completed") {
+      const fetchLatestDate = async () => {
+        try {
+          const token = localStorage.getItem("authToken");
+          const res = await fetch("http://localhost:8000/api/analytics/latest-date", {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setLatestDate(data.date);
+            console.log(latestDate)
+          }
+        } catch (err) {
+          console.error("Failed to fetch latest date:", err);
+        }
+      };
+      fetchLatestDate();
+    }
+  }, [status]);
 
   // Don’t render anything unless task is active
   if (!taskId) return null;
@@ -94,7 +117,7 @@ export default function UploadWidget() {
             <div className="space-y-2">
               <p className="text-green-700">✅ Completed!</p>
               <a
-                href="/analytics"
+                href={`/analytics?date=${latestDate || ''}`}
                 className="block w-full text-center px-2 py-1 bg-green-600 text-white rounded text-xs"
               >
                 View Analysis

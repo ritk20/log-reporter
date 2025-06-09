@@ -31,7 +31,7 @@ export default function AnalyticsPage() {
     
     // State for date picker and all-time toggle
     const [selectedDate, setSelectedDate] = useState<string>(''); // empty = no date chosen
-    const [allTime, setAllTime] = useState<boolean>(false);
+    const [allTime, setAllTime] = useState<boolean>(true);
 
     // Determine what to pass to useAnalytics:
     // If allTime is true OR no date chosen, use "all"
@@ -125,7 +125,7 @@ export default function AnalyticsPage() {
       </div>
 
       <p className='flex justify-center'>Total Transactions = {data.total}</p>
-      <p className='flex justify-center mb-4'>Success Rate = {data.successRate}%</p>
+      <p className='flex justify-center mb-4'>Success Rate = {data.successRate * 100}%</p>
 
       <div className='grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 charts-container'>
         <PieChart title="Transaction Types" data={transformPieData(data.type)} />
@@ -133,7 +133,7 @@ export default function AnalyticsPage() {
         <PieChart title="Transaction Errors" data={transformPieData(data.error)} />
       </div>
 
-      <div className='mt-8 chart-container charts-section'>=
+      {/* <div className='mt-8 chart-container charts-section'>=
         <CrosstabChart title="Type vs Operation" data={data.crossTypeOp ?? {}} name={ops}/>
       </div>
       <div className='mt-8 chart-container'>
@@ -145,16 +145,16 @@ export default function AnalyticsPage() {
       <div className='mt-8 chart-container'>
         <ScatterChart title="Amount vs Transaction Index" xAxis="Transaction Index" yAxis="Amount"
           data = {data.amountDistribution} />
-      </div>
+      </div> */}
 
       {/* TODO:Uncomment when we make the amount distribution histogram data */}
-      <div className='mt-8'>
+      {/* <div className='mt-8'>
         <Histogram
           title="Transaction Amount Distribution"
           data={data.mergedTransactionAmountIntervals}
           stacked={true}
         />
-      </div>
+      </div> */}
 
       <div className='mt-8 chart-container charts-section'>
         <div className='grid gap-6 grid-cols-1 lg:grid-cols-2'>
@@ -177,10 +177,10 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className='flex justify-around'>
+      {/* <div className='flex justify-around'>
         <KPICard title="Processing Time Summary" mean={data.averageProcessingTime} stdev={data.stdevProcessingTime} min={data.minProcessingTime} max={data.maxProcessingTime} percentile25={data.percentile25ProcessingTime} percentile50={data.percentile50ProcessingTime} percentile75={data.percentile75ProcessingTime}/>
         <KPICard title="Transaction Amount Summary" mean={data.averageTransactionAmount} stdev={data.stdevTransactionAmount} min={data.minTransactionAmount} max={data.maxTransactionAmount} percentile25={data.percentile25TransactionAmount} percentile50={data.percentile50TransactionAmount} percentile75={data.percentile75TransactionAmount}/>
-      </div> 
+      </div>  */}
 
       <div className="mt-8" id='analytics-table'>
         <DuplicateTokensTable data={data.duplicateTokens}/>
