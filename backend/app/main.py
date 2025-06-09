@@ -53,3 +53,13 @@ async def mongo_health_check():
         return {"status": "ok", "total_logs": count}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+    
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Starting app - connecting to MongoDB")
+    await connect_to_mongo()
+    yield
+    print("Shutting down app - closing MongoDB connection")
+    await close_mongo_connection()
+
+app.router.lifespan_context = lifespan

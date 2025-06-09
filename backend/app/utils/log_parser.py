@@ -4,7 +4,7 @@ import pandas as pd
 import re
 import base64
 import json
-
+pd.set_option('future.no_silent_downcasting', True)
 def parser_log_file_from_content(content: str):
     log_pattern = re.compile(
         r'(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\s+(?P<level>\w+)\s+(?P<module>[\w:]+(?:\{[^\}]+\})?):\s+(?P<message>.*?)(?=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z|$)',
@@ -62,7 +62,7 @@ def extract_tokens_from_msg(text):
     matches = re.findall(r'<Detail name="tag" value="([^"]+)"', text)
     return [decode_details(match) for match in matches] if matches else []
 def extract_tag_value(text,tag):
-    match=re.search(rf"{tag}[6>]*>(.*?)</{tag}>",text)
+    match=re.search(rf"{tag}[6>]>(.?)</{tag}>",text)
     return match.group(1) if match else None
 def decode_details(encoded_data):
     if not encoded_data:
@@ -203,7 +203,7 @@ def combine_logs(logs):
     df["Time_to_Transaction_secs"] = df["Time_to_Transaction_secs"].fillna(0)
 
     # Convert success/failure to binary
-    df["Result_of_Transaction"] = df["Result_of_Transaction"].replace({'SUCCESS': 1, 'FAILURE': 0})
+    df["Result_of_Transaction"] = df["Result_of_Transaction"].replace({'SUCCESS': 1, 'FAILURE': 0}).fillna(0).astype(int)
 
     # Additional computed fields
     df["input_amount"] = df["Req_Tot_Amount"].astype(float)
@@ -214,5 +214,5 @@ def combine_logs(logs):
 
     # Drop unnecessary columns
     # df = df.drop(columns=["SenderOrgId", "ReceiverOrgId"], errors='ignore')
-    df.dropna()
+    df=df.dropna()
     return df

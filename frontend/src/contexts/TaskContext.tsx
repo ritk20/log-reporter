@@ -1,13 +1,30 @@
 // src/contexts/TaskContext.tsx
-import React, { createContext, useContext, useState } from "react";
+import { createContext } from "react";
 
-type TaskStatus = "idle" | "processing" | "completed" | "failed";
+export interface TaskProgress {
+  current: number;
+  total: number;
+  message?: string;
+}
 
 export interface TaskInfo {
   taskId: string | null;
   status: TaskStatus;
-  error?: string | null;
+  error: string | null;
+  progress: TaskProgress | null;
 }
+
+type TaskStatus = 
+  | "idle"
+  | "uploading"
+  | "processing"
+  | "extracting_files"
+  | "parsing_logs"
+  | "processing_records"
+  | "storing_data"
+  | "generating_report"
+  | "completed"
+  | "failed";
 
 interface TaskContextValue {
   task: TaskInfo;
@@ -15,27 +32,4 @@ interface TaskContextValue {
   clearTask: () => void;
 }
 
-const TaskContext = createContext<TaskContextValue | undefined>(undefined);
-
-export function useTask() {
-  const ctx = useContext(TaskContext);
-  if (!ctx) throw new Error("useTask must be used within TaskProvider");
-  return ctx;
-}
-
-export function TaskProvider({ children }: { children: React.ReactNode }) {
-  const [task, setTaskState] = useState<TaskInfo>({
-    taskId: null,
-    status: "idle",
-    error: null,
-  });
-
-  const setTask = (t: TaskInfo) => setTaskState(t);
-  const clearTask = () => setTaskState({ taskId: null, status: "idle", error: null });
-
-  return (
-    <TaskContext.Provider value={{ task, setTask, clearTask }}>
-      {children}
-    </TaskContext.Provider>
-  );
-}
+export const TaskContext = createContext<TaskContextValue | undefined>(undefined);
