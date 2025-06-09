@@ -55,7 +55,7 @@ export default function UploadWidget() {
       const fetchLatestDate = async () => {
         try {
           const token = localStorage.getItem("authToken");
-          const res = await fetch("http://localhost:8000/api/analytics/latest-date", {
+          const res = await fetch("http://localhost:8000/analytics/latest-date", {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (res.ok) {
@@ -69,7 +69,7 @@ export default function UploadWidget() {
       };
       fetchLatestDate();
     }
-  }, [status]);
+  }, [status, latestDate]);
 
   // Don’t render anything unless task is active
   if (!taskId) return null;
@@ -113,7 +113,7 @@ export default function UploadWidget() {
             </div>
           )}
 
-          {status === "completed" && (
+          {status === "completed" && latestDate !== '' && (
             <div className="space-y-2">
               <p className="text-green-700">✅ Completed!</p>
               <a

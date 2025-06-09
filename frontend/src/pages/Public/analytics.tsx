@@ -133,7 +133,7 @@ export default function AnalyticsPage() {
         <PieChart title="Transaction Errors" data={transformPieData(data.error)} />
       </div>
 
-      {/* <div className='mt-8 chart-container charts-section'>=
+      <div className='mt-8 chart-container charts-section'>=
         <CrosstabChart title="Type vs Operation" data={data.crossTypeOp ?? {}} name={ops}/>
       </div>
       <div className='mt-8 chart-container'>
@@ -142,7 +142,8 @@ export default function AnalyticsPage() {
       <div className='mt-8 chart-container'>
         <CrosstabChart title="Operation vs Error" data={data.crossOpError ?? {}} name={errors} />
       </div>
-      <div className='mt-8 chart-container'>
+
+      {/* <div className='mt-8 chart-container'>
         <ScatterChart title="Amount vs Transaction Index" xAxis="Transaction Index" yAxis="Amount"
           data = {data.amountDistribution} />
       </div> */}

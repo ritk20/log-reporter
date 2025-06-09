@@ -12,7 +12,7 @@ export function useAnalytics(date: string) {
       setIsLoading(true);
       setError(null);
 
-      // If date === "all", we hit /api/analytics?date=all
+      // If date === "all", we hit /analytics?date=all
       // Otherwise /api/analytics?date=YYYY-MM-DD
 
       try {

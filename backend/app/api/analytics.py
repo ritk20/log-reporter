@@ -29,14 +29,22 @@ def generate_summary_report():
 @router.get("/latest-date", tags=["Analytics"])
 async def get_latest_date():
     """Get the date of the most recent daily summary"""
-    latest_doc = await daily_collection.find_one(
+    latest_doc = daily_collection.find_one(
         {}, 
         sort=[("date", -1)],
         projection={"date": 1, "_id": 0}
     )
     if not latest_doc:
         raise HTTPException(status_code=404, detail="No daily summaries found")
-    return {"date": latest_doc["date"]}
+    
+    # Convert date to string format if it's a datetime object
+    if isinstance(latest_doc["date"], datetime.datetime):
+        date_str = latest_doc["date"].strftime("%Y-%m-%d")
+    else:
+        date_str = latest_doc["date"]
+        
+    logging.info(f"Latest analytics date: {date_str}")
+    return {"date": date_str}
 
 @router.get("/analytics", tags=["Analytics"])
 async def get_analytics(date: str = Query(..., description="YYYY-MM-DD or 'all'")):

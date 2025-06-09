@@ -9,12 +9,12 @@ from pymongo.collection import Collection
 def get_type_counts(collection: Collection):
     pipeline = [{"$group": {"_id": "$Type_Of_Transaction", "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
-    return {res["_id"]: res["count"] for res in results if res["_id"]}
+    return Counter({res["_id"]: res["count"] for res in results if res["_id"]})
 
 def get_operation_counts(collection: Collection):
     pipeline = [{"$group": {"_id": "$Operation", "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
-    return defaultdict({res["_id"]: res["count"] for res in results if res["_id"]})
+    return Counter({res["_id"]: res["count"] for res in results if res["_id"]})
 
 def get_error_counts(collection: Collection):
     pipeline = [{"$group": {"_id": "$ErrorCode", "count": {"$sum": 1}}}]
@@ -234,6 +234,7 @@ def aggregate_daily_summary(collection: Collection, daily_collection: Collection
     end_time_iso = max_time_val.isoformat() if hasattr(max_time_val, "isoformat") else max_time_val
 
     temp_token_coll = get_temptoken_collection()
+    duplicate_tokens = list(temp_token_coll.find({}, {'_id': 0}))
 
     summary_doc = {
         "start_time": start_time_iso,
@@ -253,7 +254,7 @@ def aggregate_daily_summary(collection: Collection, daily_collection: Collection
             "processingTimeByInputs": processing_time_by_inputs,
             "processingTimeByOutputs": processing_time_by_outputs,
             "transactionStatsBy5MinInterval": interval_stats,
-            "duplicateTokens": temp_token_coll
+            "duplicateTokens": duplicate_tokens
         }
     }
 
