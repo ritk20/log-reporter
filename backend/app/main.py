@@ -39,6 +39,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(analytics_router)
+import logging
 
 @app.get("/health")
 async def health_check():
