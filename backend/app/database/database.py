@@ -124,4 +124,8 @@ def get_database_client():
     if mongodb.client is None:
         logger.error("MongoDB client not initialized")
         raise RuntimeError("Database connection not established")
+<<<<<<< HEAD
     return mongodb.client
+=======
+    return mongodb.client
+>>>>>>> 2dbc8182d505728cc46df2cc4d03673aadec353b
