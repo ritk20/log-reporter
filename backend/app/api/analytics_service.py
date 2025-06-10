@@ -9,17 +9,17 @@ from pymongo.collection import Collection
 def get_type_counts(collection: Collection):
     pipeline = [{"$group": {"_id": "$Type_Of_Transaction", "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
-    return Counter({res["_id"]: res["count"] for res in results if res["_id"]})
+    return {res["_id"]: res["count"] for res in results if res["_id"]}
 
 def get_operation_counts(collection: Collection):
     pipeline = [{"$group": {"_id": "$Operation", "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
-    return Counter({res["_id"]: res["count"] for res in results if res["_id"]})
+    return {res["_id"]: res["count"] for res in results if res["_id"]}
 
 def get_error_counts(collection: Collection):
     pipeline = [{"$group": {"_id": "$ErrorCode", "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
-    return Counter({res["_id"]: res["count"] for res in results if res["_id"]})
+    return {res["_id"]: res["count"] for res in results if res["_id"]}
 
 def get_result_counts(collection: Collection):
     pipeline = [{"$group": {"_id": "$Result_of_Transaction", "count": {"$sum": 1}}}]
@@ -204,6 +204,73 @@ def get_5min_interval_stats(collection: Collection):
         })
     return interval_stats
 
+def calculate_transaction_statistics(collection):
+    import numpy as np
+
+    pipeline = [
+        {
+            "$project": {
+                "processingTime": "$Time_to_Transaction_secs",
+                "transactionAmount": "$Req_Tot_Amount"
+            }
+        }
+    ]
+
+    cursor = collection.aggregate(pipeline)
+
+    processing_times = []
+    transaction_amounts = []
+
+    for doc in cursor:
+        if doc.get("processingTime") is not None:
+            processing_times.append(doc["processingTime"])
+        if doc.get("transactionAmount") is not None:
+            transaction_amounts.append(doc["transactionAmount"])
+
+    stats = {}
+
+    # Helper to round to 2 decimal places
+    def r2(val):
+        return round(float(val), 2)
+
+    # Processing time statistics
+    if processing_times:
+        stats["averageProcessingTime"] = r2(np.mean(processing_times))
+        stats["stdevProcessingTime"] = r2(np.std(processing_times, ddof=1)) if len(processing_times) > 1 else 0
+        stats["minProcessingTime"] = r2(np.min(processing_times))
+        stats["maxProcessingTime"] = r2(np.max(processing_times))
+        stats["percentile25ProcessingTime"] = r2(np.percentile(processing_times, 25))
+        stats["percentile50ProcessingTime"] = r2(np.percentile(processing_times, 50))
+        stats["percentile75ProcessingTime"] = r2(np.percentile(processing_times, 75))
+    else:
+        stats["averageProcessingTime"] = 0
+        stats["stdevProcessingTime"] = 0
+        stats["minProcessingTime"] = 0
+        stats["maxProcessingTime"] = 0
+        stats["percentile25ProcessingTime"] = 0
+        stats["percentile50ProcessingTime"] = 0
+        stats["percentile75ProcessingTime"] = 0
+
+    # Transaction amount statistics
+    if transaction_amounts:
+        stats["averageTransactionAmount"] = r2(np.mean(transaction_amounts))
+        stats["stdevTransactionAmount"] = r2(np.std(transaction_amounts, ddof=1)) if len(transaction_amounts) > 1 else 0
+        stats["minTransactionAmount"] = r2(np.min(transaction_amounts))
+        stats["maxTransactionAmount"] = r2(np.max(transaction_amounts))
+        stats["percentile25TransactionAmount"] = r2(np.percentile(transaction_amounts, 25))
+        stats["percentile50TransactionAmount"] = r2(np.percentile(transaction_amounts, 50))
+        stats["percentile75TransactionAmount"] = r2(np.percentile(transaction_amounts, 75))
+    else:
+        stats["averageTransactionAmount"] = 0
+        stats["stdevTransactionAmount"] = 0
+        stats["minTransactionAmount"] = 0
+        stats["maxTransactionAmount"] = 0
+        stats["percentile25TransactionAmount"] = 0
+        stats["percentile50TransactionAmount"] = 0
+        stats["percentile75TransactionAmount"] = 0
+
+    return stats
+
 def aggregate_daily_summary(collection: Collection, daily_collection: Collection):
     
     type_counts = get_type_counts(collection)
@@ -217,6 +284,7 @@ def aggregate_daily_summary(collection: Collection, daily_collection: Collection
     processing_time_by_inputs = get_processing_time_by_inputs(collection)
     processing_time_by_outputs = get_processing_time_by_outputs(collection)
     interval_stats = get_5min_interval_stats(collection)
+    transaction_stats = calculate_transaction_statistics(collection)
     
     # Get min and max Request_timestamp directly (assumed always valid ISO datetime or datetime obj)
     minmax_time_result = list(collection.aggregate([
@@ -240,10 +308,10 @@ def aggregate_daily_summary(collection: Collection, daily_collection: Collection
         "start_time": start_time_iso,
         "end_time": end_time_iso,
         "summary": {
-            "type": [{k: v} for k, v in type_counts.items()],
-            "operation": [{k: v} for k, v in operation_counts.items()],
-            "error": [{k: v} for k, v in error_counts.items()],
-            "result": [{k: v} for k, v in result_counts.items()],
+            "type": dict(type_counts),
+            "operation": dict(operation_counts),
+            "error": dict(error_counts),
+            "result": dict(result_counts),
             "mergedTransactionAmountIntervals": bucket_docs,
             "total": total_transactions,
             "successRate": success_rate,
@@ -254,7 +322,8 @@ def aggregate_daily_summary(collection: Collection, daily_collection: Collection
             "processingTimeByInputs": processing_time_by_inputs,
             "processingTimeByOutputs": processing_time_by_outputs,
             "transactionStatsBy5MinInterval": interval_stats,
-            "duplicateTokens": duplicate_tokens
+            "duplicateTokens": duplicate_tokens,
+            **transaction_stats
         }
     }
 
@@ -319,10 +388,10 @@ def aggregate_overall_summary(daily_collection: Collection, overall_collection: 
     avg_processing_by_outputs = [{"x": k, "y": sum(v) / len(v)} for k, v in overall_processing_time_by_outputs.items()]
 
     overall_summary_doc = {
-        "type": [{k: v} for k, v in overall_type.items()],
-        "operation": [{k: v} for k, v in overall_operation.items()],
-        "error": [{k: v} for k, v in overall_error.items()],
-        "result": [{k: v} for k, v in overall_result.items()],
+        "type": dict(overall_type),
+        "operation": dict(overall_operation),
+        "error": dict(overall_error),
+        "result": dict(overall_result),
         "total": overall_total,
         "successRate": (overall_success_rate_sum / count_days) if count_days else 0,
         "averageProcessingTime": (overall_avg_processing_time_sum / count_days) if count_days else 0,

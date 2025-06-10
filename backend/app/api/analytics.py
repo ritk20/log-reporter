@@ -64,21 +64,13 @@ async def get_analytics(date: str = Query(..., description="YYYY-MM-DD or 'all'"
             return doc
 
         # 2) Daily summary
-        try:
-            # Parse string "YYYY-MM-DD" into a datetime
-            dt = datetime.datetime.strptime(date, "%Y-%m-%d")
-            day_start = datetime.datetime(dt.year, dt.month, dt.day)
-        except ValueError:
-            raise HTTPException(
-                status_code=400, 
-                detail="Date must be in YYYY-MM-DD format or 'all'"
-            )
-
         # Query daily_summary
         doc = daily_collection.find_one(
-            {"date": day_start}, 
-            {"_id": 0}
+            {"date": date},
+            {"_id": 0, "summary": 1}
         )
+        if doc and "summary" in doc:
+            doc = doc["summary"]
         if not doc:
             raise HTTPException(status_code=404, detail=f"No data found for {date}")
         return doc

@@ -154,12 +154,12 @@ class LogStorageService:
                             tokenIds.append(token_id)
                         
                         token_occurrence = {
-                        "value": input_token.get("value"),
+                        "amount": input_token.get("value"),
                         "currency": input_token.get("currency", "unknown"),
                         "timestamp": log_entry['Request_timestamp'],
-                        "SenderOrgId": log_entry.get('SenderOrgId'),
-                        "ReceiverOrgId": log_entry.get('ReceiverOrgId'),
-                        "transactionId": log_entry['Transaction_Id'],
+                        "senderOrg": log_entry.get('SenderOrgId'),
+                        "receiverOrg": log_entry.get('ReceiverOrgId'),
+                        "Transaction_Id": log_entry['Transaction_Id'],
                         "Msg_id": log_entry['Msg_id'],
                         "_processed_at": log_entry['_processed_at'],
                         "_version": 1
@@ -202,12 +202,12 @@ class LogStorageService:
                 existing_token = tokens_collection.find_one({"tokenId": id})
                 if existing_token:
                     duplicate_tokens.append({
-                        "tokenID": existing_token.get("tokenId"),
+                        "tokenId": existing_token.get("tokenId"),
                         "firstSeen": existing_token.get("occurrences", [{}])[0].get("timestamp") if existing_token.get("occurrences") else None,
                         "lastSeen": existing_token.get("occurrences", [{}])[-1].get("timestamp") if existing_token.get("occurrences") else None,
                         "count": len(existing_token.get("occurrences", [])),
-                        "numberOfSenders": len(set(o.get("SenderOrgID") for o in existing_token.get("occurrences", []) if o.get("SenderOrgID"))),
-                        "numberOfReceivers": len(set(o.get("ReceiverOrgID") for o in existing_token.get("occurrences", []) if o.get("ReceiverOrgID"))),
+                        "uniqueSenderOrgs": len(set(o.get("SenderOrg") for o in existing_token.get("occurrences", []) if o.get("SenderOrg"))),
+                        "uniqueReceiverOrgs": len(set(o.get("ReceiverOrg") for o in existing_token.get("occurrences", []) if o.get("ReceiverOrg"))),
                         "totalAmount": sum(float(o.get("value", 0)) for o in existing_token.get("occurrences", [])),
                         "occurrences": existing_token.get("occurrences", [])
                     })
