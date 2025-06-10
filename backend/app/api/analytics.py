@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.api.analytics_service import aggregate_daily_summary, aggregate_overall_summary
 from app.database.database import get_temptoken_collection 
 import datetime
-
+from app.api.auth_jwt import verify_token 
 # logger = logging(__name__)
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
@@ -28,7 +28,7 @@ def generate_summary_report():
         raise
 
 @router.get("/latest-date", tags=["Analytics"])
-async def get_latest_date():
+async def get_latest_date(auth : dict = Depends(verify_token)):
     """Get the date of the most recent daily summary"""
     latest_doc = daily_collection.find_one(
         {}, 
@@ -48,7 +48,7 @@ async def get_latest_date():
     return {"date": date_str}
 
 @router.get("/analytics", tags=["Analytics"])
-async def get_analytics(date: str = Query(..., description="YYYY-MM-DD or 'all'")):
+async def get_analytics(date: str = Query(..., description="YYYY-MM-DD or 'all'"),auth : dict = Depends(verify_token)):
     """
     Get analytics data for a specific date or all time
     """
