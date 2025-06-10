@@ -21,7 +21,8 @@ def generate_summary_report():
     try:
         get_temptoken_collection()
         aggregate_daily_summary(tempcollection, daily_collection)
-        aggregate_overall_summary(daily_collection, overall_collection) 
+        # TODO: uncomment when we correct the overall summary format
+        # aggregate_overall_summary(daily_collection, overall_collection) 
     except Exception as e:
         logging.error(f"Error in generate_summary_report: {e}", exc_info=True)
         raise
