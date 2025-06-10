@@ -7,9 +7,9 @@ interface HistogramDataPoint {
   load: number;
   transfer: number;
   redeem: number;
-  split: number;
-  merge: number;
-  issue: number;
+  split?: number;
+  merge?: number;
+  issue?: number;
 }
 
 interface HistogramProps {
@@ -88,6 +88,12 @@ export default function Histogram({
     legend: {
       data: legendData,
       top: 30,
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '15%',
+      containLabel: true
     },
     xAxis: {
       type: "category" as const,

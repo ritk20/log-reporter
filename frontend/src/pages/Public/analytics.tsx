@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import '../../components/charts/echartsSetup.ts'
 import PieChart from '../../components/charts/Pie.tsx';
 import CrosstabChart from '../../components/charts/Crosstab.tsx';
@@ -28,16 +29,36 @@ export default function AnalyticsPage() {
 
     //for now, we use datepicker for one day/all-time summary
     // datePicker: "" means no date selected → treat as All Time in our logic
-    
-    // State for date picker and all-time toggle
-    const [selectedDate, setSelectedDate] = useState<string>(''); // empty = no date chosen
-    const [allTime, setAllTime] = useState<boolean>(true);
 
-    // Determine what to pass to useAnalytics:
-    // If allTime is true OR no date chosen, use "all"
-    const dateParam = allTime || !selectedDate ? 'all' : selectedDate;
+    const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const date = searchParams.get('date');
 
-    const { data, isLoading, error } = useAnalytics(dateParam);
+    // Remove these state variables since we'll use URL params instead
+    // const [selectedDate, setSelectedDate] = useState<string>('');
+    // const [allTime, setAllTime] = useState<boolean>(true);
+
+    const dateParam = searchParams.get("date") ?? "all";
+    const [isAllTime, setIsAllTime] = useState(dateParam === "all");
+    const [selectedDate, setSelectedDate] = useState(
+      dateParam === "all" ? '' : dateParam
+    );
+
+    useEffect(() => {
+      const currentDate = searchParams.get("date") ?? "all";
+      setIsAllTime(currentDate === "all");
+      if (currentDate !== "all") {
+        setSelectedDate(currentDate);
+      }
+    }, [searchParams]);
+
+    useEffect(() => {
+      if (!date) {
+        navigate('/analytics?date=all', { replace: true });
+      }
+    }, [date, navigate]);
+
+    const { data, isLoading, error } = useAnalytics(date || 'all');
 
     if (isLoading) {
       return <LoadingSpinner/>
@@ -81,20 +102,20 @@ export default function AnalyticsPage() {
       <div className="flex-1 flex justify-center">
         <div id="analytics-header" className="flex flex-col items-center">
           <h1 className='text-2xl font-bold'>Transaction Analytics Dashboard</h1>
-          {/* Date selector + All Time */}
-          <div className="flex gap-4 items-center mt-2">
+            {/* Date selector + All Time */}
+            <div className="flex gap-4 items-center mt-2">
             <h1 className='font-semibold'>Report Period: </h1>
             <label className="flex items-center space-x-2">
               <input
-                type="checkbox"
-                checked={allTime}
-                onChange={(e) => {
-                  setAllTime(e.target.checked);
-                  if (e.target.checked) {
-                    setSelectedDate('');
-                  }
-                }}
-                className="h-4 w-4"
+              type="checkbox"
+              checked={isAllTime}
+              onChange={(e) => {
+                const newVal = e.target.checked;
+                setIsAllTime(newVal);
+                if (newVal) {
+                setSearchParams({ date: "all" });
+                }
+              }}
               />
               <span className="text-gray-700">All-Time</span>
             </label>
@@ -102,16 +123,26 @@ export default function AnalyticsPage() {
             <label className="flex items-center space-x-2">
               <span className="text-gray-700">Select Date:</span>
               <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  setAllTime(false);
-                }}
-                className="border px-2 py-0.5"
-                disabled={allTime}
+              type="date"
+              disabled={isAllTime}
+              value={selectedDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedDate(val);
+              }}
               />
             </label>
+            <button
+              className="ml-2 px-3 py-1 bg-blue-500 text-white rounded disabled:opacity-50"
+              disabled={isAllTime || !selectedDate}
+              onClick={() => {
+              if (selectedDate) {
+                setSearchParams({ date: selectedDate });
+              }
+              }}
+            >
+              Search
+            </button>
           </div>
 
           <button 
@@ -149,13 +180,13 @@ export default function AnalyticsPage() {
       </div> */}
 
       {/* TODO:Uncomment when we make the amount distribution histogram data */}
-      {/* <div className='mt-8'>
+      <div className='m-8'>
         <Histogram
           title="Transaction Amount Distribution"
           data={data.mergedTransactionAmountIntervals}
           stacked={true}
         />
-      </div> */}
+      </div>
 
       <div className='mt-8 chart-container charts-section'>
         <div className='grid gap-6 grid-cols-1 lg:grid-cols-2'>
@@ -178,10 +209,10 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* <div className='flex justify-around'>
+      <div className='flex justify-around'>
         <KPICard title="Processing Time Summary" mean={data.averageProcessingTime} stdev={data.stdevProcessingTime} min={data.minProcessingTime} max={data.maxProcessingTime} percentile25={data.percentile25ProcessingTime} percentile50={data.percentile50ProcessingTime} percentile75={data.percentile75ProcessingTime}/>
         <KPICard title="Transaction Amount Summary" mean={data.averageTransactionAmount} stdev={data.stdevTransactionAmount} min={data.minTransactionAmount} max={data.maxTransactionAmount} percentile25={data.percentile25TransactionAmount} percentile50={data.percentile50TransactionAmount} percentile75={data.percentile75TransactionAmount}/>
-      </div>  */}
+      </div> 
 
       <div className="mt-8" id='analytics-table'>
         <DuplicateTokensTable data={data.duplicateTokens}/>

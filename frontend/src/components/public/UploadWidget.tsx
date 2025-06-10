@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useTask } from "../../hooks/useTask";
+import { useNavigate } from "react-router-dom";
 
 export default function UploadWidget() {
+  const navigate = useNavigate();
   const { task, setTask, clearTask } = useTask();
   const { taskId, status, error, progress } = task;
   const [latestDate, setLatestDate] = useState<string | null>(null);
@@ -56,12 +58,17 @@ export default function UploadWidget() {
         try {
           const token = localStorage.getItem("authToken");
           const res = await fetch("http://localhost:8000/analytics/latest-date", {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
           });
           if (res.ok) {
             const data = await res.json();
-            setLatestDate(data.date);
-            console.log(latestDate)
+            if (data.date) {
+              setLatestDate(data.date);
+              console.log("Latest date fetched:", data.date);
+            }
           }
         } catch (err) {
           console.error("Failed to fetch latest date:", err);
@@ -69,7 +76,13 @@ export default function UploadWidget() {
       };
       fetchLatestDate();
     }
-  }, [status, latestDate]);
+  }, [status]);
+
+  const handleViewAnalysis = () => {
+    if (latestDate) {
+      navigate(`/analytics?date=${latestDate}`);
+    }
+  };
 
   // Don’t render anything unless task is active
   if (!taskId) return null;
@@ -116,12 +129,12 @@ export default function UploadWidget() {
           {status === "completed" && latestDate !== '' && (
             <div className="space-y-2">
               <p className="text-green-700">✅ Completed!</p>
-              <a
-                href={`/analytics?date=${latestDate || ''}`}
+              <button
+                onClick={handleViewAnalysis}
                 className="block w-full text-center px-2 py-1 bg-green-600 text-white rounded text-xs"
               >
                 View Analysis
-              </a>
+              </button>
             </div>
           )}
 

@@ -103,28 +103,6 @@ export default function TemporalDashboard({ rawData }: TemporalDashboardProps) {
     }
   }, [rawData, fromDate, toDate, filter])
 
-  // const buckets = useMemo(() => {
-  //   const map: Record<string, Bucket> = {}
-  //   const d = new Date(fromDate)
-  //   while (d <= toDate) {
-  //     const key = d.toISOString().slice(0,10)
-  //     map[key] = { day:key, count:0, sum_amount:0, byType:{},byOp:{},byErr:{} }
-  //     d.setDate(d.getDate()+1)
-  //   }
-  //   rawData.forEach(tx => {
-  //     const dt = new Date(tx.request_time)
-  //     if (dt < fromDate || dt > toDate) return
-  //     const key = dt.toISOString().slice(0,10)
-  //     const b = map[key]
-  //     b.count += 1
-  //     b.sum_amount += tx.amount
-  //     b.byType[tx.type] = (b.byType[tx.type]||0)+1
-  //     b.byOp[tx.operation] = (b.byOp[tx.operation]||0)+1
-  //     b.byErr[tx.error] = (b.byErr[tx.error]||0)+1
-  //   })
-  //   return Object.values(map)
-  // }, [rawData, fromDate, toDate])
-
   const dates = buckets.map(b => b.key)
   const allSeries = useMemo(() => {
     if (groupBy === 'count') {

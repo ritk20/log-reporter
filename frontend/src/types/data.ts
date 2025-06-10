@@ -24,9 +24,9 @@ export interface AmountInterval {
   load: number;
   transfer: number;
   redeem: number;
-  merge: number;
-  split: number;
-  issue: number;
+  merge?: number;
+  split?: number;
+  issue?: number;
 }
 
 export interface TransactionStats {
