@@ -16,6 +16,7 @@ import './print-analytics.css';
 import { useAnalytics } from '../../hooks/useAnalytics.tsx';
 import { LoadingSpinner } from '../../components/public/Loading.tsx';
 import KPICard from '../../components/public/KPIcards.tsx';
+import TemporalDashboard from '../../components/charts/TimeSeries.tsx';
 // import { TransactionType, OperationType, ErrorCode } from '../../types/enums.ts';
 
 //TODO: add timeValue and timeUnit to the API call
@@ -156,7 +157,7 @@ export default function AnalyticsPage() {
       </div>
 
       <p className='flex justify-center'>Total Transactions = {data.total}</p>
-      <p className='flex justify-center mb-4'>Success Rate = {data.successRate * 100}%</p>
+      <p className='flex justify-center mb-4'>Success Rate = {data.successRate}%</p>
 
       <div className='grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 charts-container'>
         <PieChart title="Transaction Types" data={transformPieData(data.type)} />
@@ -218,10 +219,18 @@ export default function AnalyticsPage() {
         <DuplicateTokensTable data={data.duplicateTokens}/>
       </div>
       
-      {/* <div className='mt-8 chart-container'>
+      <div className='mt-8 chart-container'>
         <h2 className='text-xl font-semibold mb-4'>Temporal Dashboard</h2>
-        <TemporalDashboard rawData={data.lastXTransactions}/>
-      </div> */}
+        <TemporalDashboard 
+          aggregatedData={data.temporal ?? data.transactionStatsByhourInterval.map(e => ({
+            ...e,
+            byType: e.byType || {},
+            byOp: e.byOp || {},
+            byErr: e.byErr || {}
+          }))}
+          isHourlyData={!data.temporal}
+        />
+      </div>
       {/* <div className='mt-8'>
         <TokenFlowGraph/>
       </div> */}

@@ -59,6 +59,17 @@ export interface DuplicateToken {
   }>;
 }
 
+export interface AggEntry {
+  date?: string; // "YYYY-MM-DD"
+  interval_start?: string;
+  interval_end?: string;
+  count: number;
+  sum_amount: number;
+  byType?: Record<string, number>;
+  byOp?:   Record<string, number>;
+  byErr?:  Record<string, number>;
+}
+
 export type TxSummary = {
   total: number
   successRate: number
@@ -90,4 +101,6 @@ export type TxSummary = {
   processingTimeByInputs: Array<{ x: number; y: number }>
   processingTimeByOutputs: Array<{ x: number; y: number }>
   duplicateTokens: DuplicateToken[]
+  temporal?: AggEntry[]
+    transactionStatsByhourInterval: AggEntry[]
 }
