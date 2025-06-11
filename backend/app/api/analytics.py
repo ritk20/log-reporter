@@ -4,10 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pymongo import MongoClient
 from app.core.config import settings
 from app.api.analytics_service import aggregate_daily_summary, aggregate_overall_summary
-from app.database.database import get_temptoken_collection 
 import datetime
 from app.api.auth_jwt import verify_token 
-# logger = logging(__name__)
+
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 client = MongoClient(settings.MONGODB_URL)
@@ -16,16 +15,14 @@ tempcollection = db[settings.MONGODB_TEMP_COLLECTION_NAME]
 daily_collection = db[settings.MONGODB_DAILY_SUMM_COLLECTION_NAME]
 overall_collection = db[settings.MONGODB_SUMM_COLLECTION_NAME]
 
-
-def generate_summary_report():
+def generate_summary_report(auth: dict = Depends(verify_token)):
     try:
-        get_temptoken_collection()
-        aggregate_daily_summary(tempcollection, daily_collection)
-        # TODO: uncomment when we correct the overall summary format
-        # aggregate_overall_summary(daily_collection, overall_collection) 
+        date_str = aggregate_daily_summary(tempcollection, daily_collection)
+        aggregate_overall_summary(date_str, daily_collection, overall_collection)
+        return {"message": "Summary generated successfully", "date": date_str}
     except Exception as e:
-        logging.error(f"Error in generate_summary_report: {e}", exc_info=True)
-        raise
+        logging.error(f"Error generating summary: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/latest-date", tags=["Analytics"])
 async def get_latest_date(auth : dict = Depends(verify_token)):

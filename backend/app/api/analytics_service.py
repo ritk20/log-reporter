@@ -1,5 +1,5 @@
 # app/api/analytics_service.py
-import math
+from fastapi import HTTPException
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from app.database.database import get_temptoken_collection
@@ -155,18 +155,17 @@ def get_processing_time_by_outputs(collection: Collection):
     pipeline = [{"$group": {"_id": "$NumberOfOutputs", "avgTime": {"$avg": "$Time_to_Transaction_secs"}}}]
     results = list(collection.aggregate(pipeline))
     return [{"x": r["_id"], "y": r["avgTime"]} for r in results]
-
-def get_5min_interval_stats(collection: Collection):
+def get_hour_interval_stats(collection: Collection):
     min_time_doc = collection.find_one({}, sort=[("Request_timestamp", 1)], projection={"Request_timestamp": 1})
     if not min_time_doc:
         return []
     min_time = min_time_doc["Request_timestamp"]
     if isinstance(min_time, str):
         min_time = datetime.fromisoformat(min_time.replace("Z", "+00:00"))
-    interval_duration = timedelta(minutes=5)
+    interval_duration = timedelta(hours=1)  # 1 hour intervals
 
     cursor = collection.find({}, projection=[
-        "Request_timestamp", "Result_of_Transaction", "input_amount", "Time_to_Transaction_secs", "ErrorCode"
+        "Request_timestamp", "Result_of_Transaction", "input_amount", "Time_to_Transaction_secs", "ErrorCode",  "Type_Of_Transaction"
     ])
 
     buckets = {}
@@ -174,7 +173,7 @@ def get_5min_interval_stats(collection: Collection):
         ts = doc["Request_timestamp"]
         ts_dt = datetime.fromisoformat(ts.replace("Z", "+00:00")) if isinstance(ts, str) else ts
         diff = ts_dt - min_time
-        interval_index = int(diff.total_seconds() // (5 * 60))
+        interval_index = int(diff.total_seconds() // (3600))
         bucket_start = min_time + interval_index * interval_duration
         if bucket_start not in buckets:
             buckets[bucket_start] = {
@@ -182,6 +181,7 @@ def get_5min_interval_stats(collection: Collection):
                 "error_count": 0,
                 "total_amount": 0,
                 "total_time": 0,
+                "byType": {"LOAD": 0, "TRANSFER": 0, "REDEEM": 0}  # Initialize the byType dictionary
             }
         buckets[bucket_start]["transaction_count"] += 1
         err_code = doc["ErrorCode"]
@@ -189,18 +189,27 @@ def get_5min_interval_stats(collection: Collection):
             buckets[bucket_start]["error_count"] += 1
         buckets[bucket_start]["total_amount"] += doc["input_amount"]
         buckets[bucket_start]["total_time"] += doc["Time_to_Transaction_secs"]
+        # Update the transaction count by type
+        typ = doc.get("Type_Of_Transaction", "UNKNOWN").upper()  # Ensure we handle case insensitivity
+        if typ in buckets[bucket_start]["byType"]:
+            buckets[bucket_start]["byType"][typ] += 1
 
     interval_stats = []
     for start_time in sorted(buckets.keys()):
         end_time = start_time + interval_duration
         stats = buckets[start_time]
+
+         # Calculate average processing time
+        avg_processing_time = stats["total_time"] / stats["transaction_count"] if stats["transaction_count"] > 0 else 0
+        
         interval_stats.append({
             "interval_start": start_time.isoformat(),
             "interval_end": end_time.isoformat(),
-            "transaction_count": stats["transaction_count"],
-            "error_count": stats["error_count"],
-            "total_amount": stats["total_amount"],
-            "total_time": stats["total_time"]
+            "count": stats["transaction_count"],
+            # "error_count": stats["error_count"],
+            "sum_amount": stats["total_amount"],
+            "average_processing_time": avg_processing_time,  # Add average processing time here
+            "byType": stats["byType"]
         })
     return interval_stats
 
@@ -270,9 +279,7 @@ def calculate_transaction_statistics(collection):
         stats["percentile75TransactionAmount"] = 0
 
     return stats
-
-def aggregate_daily_summary(collection: Collection, daily_collection: Collection):
-    
+def aggregate_daily_summary(collection, daily_collection):
     type_counts = get_type_counts(collection)
     operation_counts = get_operation_counts(collection)
     error_counts = get_error_counts(collection)
@@ -283,10 +290,9 @@ def aggregate_daily_summary(collection: Collection, daily_collection: Collection
     cross_op_error = get_cross_operation_error(collection)
     processing_time_by_inputs = get_processing_time_by_inputs(collection)
     processing_time_by_outputs = get_processing_time_by_outputs(collection)
-    interval_stats = get_5min_interval_stats(collection)
+    interval_stats = get_hour_interval_stats(collection)
     transaction_stats = calculate_transaction_statistics(collection)
-    
-    # Get min and max Request_timestamp directly (assumed always valid ISO datetime or datetime obj)
+
     minmax_time_result = list(collection.aggregate([
         {
             "$group": {
@@ -296,15 +302,21 @@ def aggregate_daily_summary(collection: Collection, daily_collection: Collection
             }
         }
     ]))
+
+    # Handle case where no data is found
+    if not minmax_time_result:
+        raise HTTPException(status_code=404, detail="No data available for daily summary")
+
     min_time_val = minmax_time_result[0]["minTime"]
     max_time_val = minmax_time_result[0]["maxTime"]
-    start_time_iso = min_time_val.isoformat() if hasattr(min_time_val, "isoformat") else min_time_val
-    end_time_iso = max_time_val.isoformat() if hasattr(max_time_val, "isoformat") else max_time_val
+    start_time_iso = min_time_val.isoformat() if hasattr(min_time_val, "isoformat") else str(min_time_val)
+    end_time_iso = max_time_val.isoformat() if hasattr(max_time_val, "isoformat") else str(max_time_val)
 
     temp_token_coll = get_temptoken_collection()
     duplicate_tokens = list(temp_token_coll.find({}, {'_id': 0}))
 
     summary_doc = {
+        "date": start_time_iso[:10],  # Ensure consistent date key
         "start_time": start_time_iso,
         "end_time": end_time_iso,
         "summary": {
@@ -314,98 +326,82 @@ def aggregate_daily_summary(collection: Collection, daily_collection: Collection
             "result": dict(result_counts),
             "mergedTransactionAmountIntervals": bucket_docs,
             "total": total_transactions,
-            "successRate": success_rate,
+            "successRate": success_rate * 100,
             "averageProcessingTime": avg_processing_time,
             "crossTypeOp": cross_type_op,
             "crossTypeError": cross_type_error,
             "crossOpError": cross_op_error,
             "processingTimeByInputs": processing_time_by_inputs,
             "processingTimeByOutputs": processing_time_by_outputs,
-            "transactionStatsBy5MinInterval": interval_stats,
+            "transactionStatsByhourInterval": interval_stats,
             "duplicateTokens": duplicate_tokens,
             **transaction_stats
         }
     }
 
-    daily_collection.update_one(
-        {"date": start_time_iso[:10]},
-        {"$set": summary_doc},
-        upsert=True
-    )
-    return 
+    date_key = start_time_iso[:10]
+    daily_collection.update_one({"date": date_key}, {"$set": summary_doc}, upsert=True)
+    return date_key
 
-def aggregate_overall_summary(daily_collection: Collection, overall_collection: Collection):
+def aggregate_overall_summary(date_str: str, daily_collection, overall_collection):
+    daily_doc = daily_collection.find_one({"date": date_str})
+    if not daily_doc:
+        raise HTTPException(status_code=404, detail=f"No daily summary found for {date_str}")
 
-    cursor = daily_collection.find()
-    overall_type = Counter()
-    overall_operation = Counter()
-    overall_error = Counter()
-    overall_result = Counter()
-    overall_total = 0
-    overall_success_rate_sum = 0
-    overall_avg_processing_time_sum = 0
-    count_days = 0
+    daily_summary = daily_doc.get("summary", {})
+    
+    # Initialize overall_doc with default values
+    overall_doc = overall_collection.find_one({"_id": "overall_summary"}) or {
+        "type": {},
+        "operation": {},
+        "error": {},
+        "result": {},
+        "count_days": 0,
+        "successRate": 0.0,
+        "averageProcessingTime": 0.0
+    }
 
-    overall_cross_type_op = defaultdict(lambda: defaultdict(int))
-    overall_cross_type_error = defaultdict(lambda: defaultdict(int))
-    overall_cross_op_error = defaultdict(lambda: defaultdict(int))
+    # Update counters
+    overall_type = Counter(overall_doc.get("type", {}))
+    overall_operation = Counter(overall_doc.get("operation", {}))
+    overall_error = Counter(overall_doc.get("error", {}))
+    overall_result = Counter(overall_doc.get("result", {}))
 
-    overall_processing_time_by_inputs = defaultdict(list)
-    overall_processing_time_by_outputs = defaultdict(list)
+    overall_type.update(daily_summary.get("type", {}))
+    overall_operation.update(daily_summary.get("operation", {}))
+    overall_error.update(daily_summary.get("error", {}))
+    overall_result.update(daily_summary.get("result", {}))
 
-    for doc in cursor:
-        summary = doc.get("summary", {})
-        count_days += 1
-        overall_total += summary.get("total", 0)
-        overall_success_rate_sum += summary.get("successRate", 0)
-        overall_avg_processing_time_sum += summary.get("averageProcessingTime", 0)
+    # Update aggregated metrics
+    count_days = overall_doc.get("count_days", 0) + 1
+    success_rate_sum = overall_doc.get("successRate", 0) * overall_doc.get("count_days", 0)
+    avg_time_sum = overall_doc.get("averageProcessingTime", 0) * overall_doc.get("count_days", 0)
 
-        for d in summary.get("type", []):
-            overall_type.update(d)
-        for d in summary.get("operation", []):
-            overall_operation.update(d)
-        for d in summary.get("error", []):
-            overall_error.update(d)
-        for d in summary.get("result", []):
-            overall_result.update(d)
+    # Calculate new averages
+    new_success_rate = daily_summary.get("successRate", 0)
+    new_avg_time = daily_summary.get("averageProcessingTime", 0)
 
-        for t, op_dict in summary.get("crossTypeOp", {}).items():
-            for op, cnt in op_dict.items():
-                overall_cross_type_op[t][op] += cnt
-        for t, err_dict in summary.get("crossTypeError", {}).items():
-            for err, cnt in err_dict.items():
-                overall_cross_type_error[t][err] += cnt
-        for op, err_dict in summary.get("crossOpError", {}).items():
-            for err, cnt in err_dict.items():
-                overall_cross_op_error[op][err] += cnt
-
-        for item in summary.get("processingTimeByInputs", []):
-            overall_processing_time_by_inputs[item["x"]].append(item["y"])
-        for item in summary.get("processingTimeByOutputs", []):
-            overall_processing_time_by_outputs[item["x"]].append(item["y"])
-
-    avg_processing_by_inputs = [{"x": k, "y": sum(v) / len(v)} for k, v in overall_processing_time_by_inputs.items()]
-    avg_processing_by_outputs = [{"x": k, "y": sum(v) / len(v)} for k, v in overall_processing_time_by_outputs.items()]
-
-    overall_summary_doc = {
+    updated_doc = {
+        "_id": "overall_summary",
         "type": dict(overall_type),
         "operation": dict(overall_operation),
         "error": dict(overall_error),
         "result": dict(overall_result),
-        "total": overall_total,
-        "successRate": (overall_success_rate_sum / count_days) if count_days else 0,
-        "averageProcessingTime": (overall_avg_processing_time_sum / count_days) if count_days else 0,
-        "crossTypeOp": overall_cross_type_op,
-        "crossTypeError": overall_cross_type_error,
-        "crossOpError": overall_cross_op_error,
-        "processingTimeByInputs": avg_processing_by_inputs,
-        "processingTimeByOutputs": avg_processing_by_outputs,
+        "count_days": count_days,
+        "successRate": (success_rate_sum + new_success_rate) / count_days if count_days > 0 else new_success_rate,
+        "averageProcessingTime": (avg_time_sum + new_avg_time) / count_days if count_days > 0 else new_avg_time,
+        "last_updated": date_str
     }
+
+    # Update other fields from daily_summary if needed
+    for field in ["mergedTransactionAmountIntervals", "total", "crossTypeOp", "crossTypeError", 
+                  "crossOpError", "processingTimeByInputs", "processingTimeByOutputs", 
+                  "transactionStatsByhourInterval", "duplicateTokens"]:
+        if field in daily_summary:
+            updated_doc[field] = daily_summary[field]
 
     overall_collection.update_one(
         {"_id": "overall_summary"},
-        {"$set": overall_summary_doc},
+        {"$set": updated_doc},
         upsert=True
     )
-
-    return 

@@ -12,6 +12,8 @@ class MongoDB:
     token_coll = None
     temp_coll = None
     temptoken_coll = None
+    daily_summary = None
+    overall_summary = None
 
 mongodb = MongoDB()
 
@@ -38,10 +40,14 @@ async def connect_to_mongo():
         token_coll = database[settings.MONGODB_TOKENS_COLLECTION_NAME]
         temp_coll = database[settings.MONGODB_TEMP_COLLECTION_NAME]
         temptoken_coll=database[settings.MONGODB_TEMP_TOKENS_COLLECTION_NAME]
+        daily_collection = database[settings.MONGODB_DAILY_SUMM_COLLECTION_NAME]
+        overall_collection = database[settings.MONGODB_SUMM_COLLECTION_NAME]
         
         mongodb.token_coll = token_coll
         mongodb.temp_coll = temp_coll 
         mongodb.temptoken_coll = temptoken_coll
+        mongodb.daily_summary = daily_collection
+        mongodb.overall_summary = overall_collection
 
         # Check if collection exists only ONCE and create if needed
         initialize_collections()
@@ -111,6 +117,18 @@ def get_collection():
         logger.error("MongoDB collection not initialized")
         raise RuntimeError("Database connection not established")
     return mongodb.collection
+
+def get_daily_collection():
+    if mongodb.daily_summary is None:
+        logger.error("MongoDB collection not initialized")
+        raise RuntimeError("Database connection not established")
+    return mongodb.daily_summary
+
+def get_overall_collection():
+    if mongodb.overall_summary is None:
+        logger.error("MongoDB collection not initialized")
+        raise RuntimeError("Database connection not established")
+    return mongodb.overall_summary
 
 def get_temptoken_collection():
     if mongodb.temptoken_coll is None:

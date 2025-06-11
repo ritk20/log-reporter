@@ -6,6 +6,7 @@ from app.api.upload import router as upload_router
 from app.core.config import settings
 from app.database.database import connect_to_mongo, close_mongo_connection
 from app.api.analytics import router as analytics_router
+from app.api.temporal import router as temporal_router
 
 import logging
 
@@ -39,6 +40,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(analytics_router)
+app.include_router(temporal_router)
 import logging
 
 @app.get("/health")

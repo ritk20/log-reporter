@@ -206,9 +206,9 @@ class LogStorageService:
                         "firstSeen": existing_token.get("occurrences", [{}])[0].get("timestamp") if existing_token.get("occurrences") else None,
                         "lastSeen": existing_token.get("occurrences", [{}])[-1].get("timestamp") if existing_token.get("occurrences") else None,
                         "count": len(existing_token.get("occurrences", [])),
-                        "uniqueSenderOrgs": len(set(o.get("SenderOrg") for o in existing_token.get("occurrences", []) if o.get("SenderOrg"))),
-                        "uniqueReceiverOrgs": len(set(o.get("ReceiverOrg") for o in existing_token.get("occurrences", []) if o.get("ReceiverOrg"))),
-                        "totalAmount": sum(float(o.get("value", 0)) for o in existing_token.get("occurrences", [])),
+                        "uniqueSenderOrgs": len(set(o.get("senderOrg") for o in existing_token.get("occurrences", []) if o.get("senderOrg"))),
+                        "uniqueReceiverOrgs": len(set(o.get("receiverOrg") for o in existing_token.get("occurrences", []) if o.get("receiverOrg"))),
+                        "totalAmount": sum(float(o.get("amount", 0)) for o in existing_token.get("occurrences", [])),
                         "occurrences": existing_token.get("occurrences", [])
                     })
 
