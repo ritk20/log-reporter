@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from app.utils.log_parser import parser_log_file_from_content, combine_logs
 from app.utils.log_storage import LogStorageService
 from .task_manager import update_task
+from app.api.analytics import generate_summary_report
+
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +55,6 @@ def process_zip_file(task_id: str, file_path: str, user_info: dict):
                     all_parsed_logs.extend(logs)
             except Exception as e:
                 logger.warning(f"Failed to parse file {file}: {e}")
-
         if all_parsed_logs:
             update_task(task_id, {
                 "status": "processing_records",
@@ -67,6 +68,7 @@ def process_zip_file(task_id: str, file_path: str, user_info: dict):
             })
             info = LogStorageService.store_logs_batch(records)
             df.to_json(f"{file_path}_{task_id}_output.json", orient="records")
+            generate_summary_report()
 
         update_task(task_id, {
             "status": "completed",

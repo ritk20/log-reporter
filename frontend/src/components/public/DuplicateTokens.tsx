@@ -20,38 +20,6 @@ export default function DuplicateTokensTable({
   const [page, setPage] = useState(0)
   const [error, setError] = useState<string | null>(null);
 
-  //TODO: uncomment this when you have the backend API ready
-  // const fetchDuplicateTokens = React.useCallback(async () => {
-  //   setLoading(true);
-  //   setError(null);
-    
-  //   try {
-  //     const response = await fetch(
-  //       `/api/duplicate-tokens?time_value=${selectedTimeValue}&time_unit=${selectedTimeUnit}`
-  //     );
-      
-  //     if (!response.ok) {
-  //       throw new Error('Failed to fetch duplicate tokens');
-  //     }
-      
-  //     const result = await response.json();
-      
-  //     if (result.success) {
-  //       setDuplicateTokens(result.data);
-  //     } else {
-  //       setError(result.error || 'Unknown error occurred');
-  //     }
-  //   } catch (err) {
-  //     setError(err instanceof Error ? err.message : 'An error occurred');
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // }, [selectedTimeValue, selectedTimeUnit]);
-
-  // useEffect(() => {
-  //   fetchDuplicateTokens();
-  // }, [fetchDuplicateTokens]);
-
   // For now, we will use the static data from duplicate.json
   const fetchDuplicateTokens = () => {
     setLoading(true);
@@ -92,8 +60,8 @@ export default function DuplicateTokensTable({
                   { key: 'firstSeen', label: 'First Seen' },
                   { key: 'lastSeen', label: 'Last Seen' },
                   { key: 'totalAmount', label: 'Total Amount' },
-                  { key: 'uniqueSenders', label: '# Senders' },
-                  { key: 'uniqueReceivers', label: '# Receivers' },
+                  { key: 'numberOfSenders', label: '# Senders' },
+                  { key: 'numberOfReceivers', label: '# Receivers' },
                 ].map(col => (
                   <th
                     key={col.key}

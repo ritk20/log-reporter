@@ -145,8 +145,7 @@ def combine_logs(logs):
                 "Req_input_amt_list": input_amt_list,
                 "Output_amt_list": output_amt_list,
                 "Inputs": input_list,
-                "Outputs": output_list,
-                "Token_id_before_response": token_id
+                "Outputs": output_list
             })
             
             indx=indx+1
@@ -176,9 +175,7 @@ def combine_logs(logs):
                 "Resptokens": token_details_list,
                 "Result_of_Transaction": extract_result(msg),
                 "ErrorCode": extract_result_2(msg),
-                "ErrorMsg": extract_result_3(msg),
-                "Input_amt_lists": input_amt_list,
-                "Token_id_after_transaction": token_id
+                "ErrorMsg": extract_result_3(msg)
             })
             indx_2=indx_2+1
 
@@ -209,10 +206,5 @@ def combine_logs(logs):
     df["input_amount"] = df["Req_Tot_Amount"].astype(float)
     df["NumberOfInputs"] = df["Req_input_amt_list"].apply(lambda x: len(x) if isinstance(x, list) else 0)
     df["NumberOfOutputs"] = df["Output_amt_list"].apply(lambda x: len(x) if isinstance(x, list) else 0)
-    df["Token_id_after_transaction"] = df["Token_id_after_transaction"].apply(lambda x: eval(x) if isinstance(x, str) else x)
-    df["Token_id_before_transaction"] = df["Token_id_before_response"].apply(lambda x: eval(x) if isinstance(x, str) else x)
-
-    # Drop unnecessary columns
-    # df = df.drop(columns=["SenderOrgId", "ReceiverOrgId"], errors='ignore')
     df=df.dropna()
     return df

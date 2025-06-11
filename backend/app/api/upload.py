@@ -7,8 +7,6 @@ from app.services.file_saver import save_large_upload
 from app.services.task_manager import create_task, get_task
 from app.services.zip_processor import process_zip_file
 from app.utils.thread_pool_processing import run_in_thread_pool
-import os
-print("file_saver exists:", os.path.exists("app/services/file_saver.py"))
 
 
 logger = logging.getLogger(__name__)

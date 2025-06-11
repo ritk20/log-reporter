@@ -24,9 +24,9 @@ export interface AmountInterval {
   load: number;
   transfer: number;
   redeem: number;
-  merge: number;
-  split: number;
-  issue: number;
+  merge?: number;
+  split?: number;
+  issue?: number;
 }
 
 export interface TransactionStats {
@@ -57,6 +57,17 @@ export interface DuplicateToken {
     amount: number;
     timestamp: string;
   }>;
+}
+
+export interface AggEntry {
+  date?: string; // "YYYY-MM-DD"
+  interval_start?: string;
+  interval_end?: string;
+  count: number;
+  sum_amount: number;
+  byType?: Record<string, number>;
+  byOp?:   Record<string, number>;
+  byErr?:  Record<string, number>;
 }
 
 export type TxSummary = {
@@ -90,4 +101,6 @@ export type TxSummary = {
   processingTimeByInputs: Array<{ x: number; y: number }>
   processingTimeByOutputs: Array<{ x: number; y: number }>
   duplicateTokens: DuplicateToken[]
+  temporal?: AggEntry[]
+    transactionStatsByhourInterval: AggEntry[]
 }

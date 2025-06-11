@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import '../../components/charts/echartsSetup.ts'
 import PieChart from '../../components/charts/Pie.tsx';
 import CrosstabChart from '../../components/charts/Crosstab.tsx';
@@ -15,6 +16,7 @@ import './print-analytics.css';
 import { useAnalytics } from '../../hooks/useAnalytics.tsx';
 import { LoadingSpinner } from '../../components/public/Loading.tsx';
 import KPICard from '../../components/public/KPIcards.tsx';
+import TemporalDashboard from '../../components/charts/TimeSeries.tsx';
 // import { TransactionType, OperationType, ErrorCode } from '../../types/enums.ts';
 
 //TODO: add timeValue and timeUnit to the API call
@@ -28,16 +30,36 @@ export default function AnalyticsPage() {
 
     //for now, we use datepicker for one day/all-time summary
     // datePicker: "" means no date selected → treat as All Time in our logic
-    
-    // State for date picker and all-time toggle
-    const [selectedDate, setSelectedDate] = useState<string>(''); // empty = no date chosen
-    const [allTime, setAllTime] = useState<boolean>(false);
 
-    // Determine what to pass to useAnalytics:
-    // If allTime is true OR no date chosen, use "all"
-    const dateParam = allTime || !selectedDate ? 'all' : selectedDate;
+    const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const date = searchParams.get('date');
 
-    const { data, isLoading, error } = useAnalytics(dateParam);
+    // Remove these state variables since we'll use URL params instead
+    // const [selectedDate, setSelectedDate] = useState<string>('');
+    // const [allTime, setAllTime] = useState<boolean>(true);
+
+    const dateParam = searchParams.get("date") ?? "all";
+    const [isAllTime, setIsAllTime] = useState(dateParam === "all");
+    const [selectedDate, setSelectedDate] = useState(
+      dateParam === "all" ? '' : dateParam
+    );
+
+    useEffect(() => {
+      const currentDate = searchParams.get("date") ?? "all";
+      setIsAllTime(currentDate === "all");
+      if (currentDate !== "all") {
+        setSelectedDate(currentDate);
+      }
+    }, [searchParams]);
+
+    useEffect(() => {
+      if (!date) {
+        navigate('/analytics?date=all', { replace: true });
+      }
+    }, [date, navigate]);
+
+    const { data, isLoading, error } = useAnalytics(date || 'all');
 
     if (isLoading) {
       return <LoadingSpinner/>
@@ -81,20 +103,20 @@ export default function AnalyticsPage() {
       <div className="flex-1 flex justify-center">
         <div id="analytics-header" className="flex flex-col items-center">
           <h1 className='text-2xl font-bold'>Transaction Analytics Dashboard</h1>
-          {/* Date selector + All Time */}
-          <div className="flex gap-4 items-center mt-2">
+            {/* Date selector + All Time */}
+            <div className="flex gap-4 items-center mt-2">
             <h1 className='font-semibold'>Report Period: </h1>
             <label className="flex items-center space-x-2">
               <input
-                type="checkbox"
-                checked={allTime}
-                onChange={(e) => {
-                  setAllTime(e.target.checked);
-                  if (e.target.checked) {
-                    setSelectedDate('');
-                  }
-                }}
-                className="h-4 w-4"
+              type="checkbox"
+              checked={isAllTime}
+              onChange={(e) => {
+                const newVal = e.target.checked;
+                setIsAllTime(newVal);
+                if (newVal) {
+                setSearchParams({ date: "all" });
+                }
+              }}
               />
               <span className="text-gray-700">All-Time</span>
             </label>
@@ -102,16 +124,26 @@ export default function AnalyticsPage() {
             <label className="flex items-center space-x-2">
               <span className="text-gray-700">Select Date:</span>
               <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  setAllTime(false);
-                }}
-                className="border px-2 py-0.5"
-                disabled={allTime}
+              type="date"
+              disabled={isAllTime}
+              value={selectedDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedDate(val);
+              }}
               />
             </label>
+            <button
+              className="ml-2 px-3 py-1 bg-blue-500 text-white rounded disabled:opacity-50"
+              disabled={isAllTime || !selectedDate}
+              onClick={() => {
+              if (selectedDate) {
+                setSearchParams({ date: selectedDate });
+              }
+              }}
+            >
+              Search
+            </button>
           </div>
 
           <button 
@@ -142,13 +174,14 @@ export default function AnalyticsPage() {
       <div className='mt-8 chart-container'>
         <CrosstabChart title="Operation vs Error" data={data.crossOpError ?? {}} name={errors} />
       </div>
-      <div className='mt-8 chart-container'>
+
+      {/* <div className='mt-8 chart-container'>
         <ScatterChart title="Amount vs Transaction Index" xAxis="Transaction Index" yAxis="Amount"
           data = {data.amountDistribution} />
-      </div>
+      </div> */}
 
       {/* TODO:Uncomment when we make the amount distribution histogram data */}
-      <div className='mt-8'>
+      <div className='m-8'>
         <Histogram
           title="Transaction Amount Distribution"
           data={data.mergedTransactionAmountIntervals}
@@ -186,10 +219,18 @@ export default function AnalyticsPage() {
         <DuplicateTokensTable data={data.duplicateTokens}/>
       </div>
       
-      {/* <div className='mt-8 chart-container'>
+      <div className='mt-8 chart-container'>
         <h2 className='text-xl font-semibold mb-4'>Temporal Dashboard</h2>
-        <TemporalDashboard rawData={data.lastXTransactions}/>
-      </div> */}
+        <TemporalDashboard 
+          aggregatedData={data.temporal ?? data.transactionStatsByhourInterval.map(e => ({
+            ...e,
+            byType: e.byType || {},
+            byOp: e.byOp || {},
+            byErr: e.byErr || {}
+          }))}
+          isHourlyData={!data.temporal}
+        />
+      </div>
       {/* <div className='mt-8'>
         <TokenFlowGraph/>
       </div> */}

@@ -27,7 +27,7 @@ function App() {
                   {/* <Route path="/admin/dashboard" element={<Dashboard />} /> */}
                 </Route>
                 
-                <Route path="*" element={<Navigate to="/unauthorized" replace />} />
+                {/* <Route path="*" element={<Navigate to="/unauthorized" replace />} /> */}
                 
                 {/* Analytics - Available to all authenticated users */}
                 <Route element={<PrivateRoute />}>
