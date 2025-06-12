@@ -9,6 +9,7 @@ import Upload from './pages/Admin/upload';
 import AnalyticsDashboard from './pages/Public/analytics';
 import { ErrorBoundary } from './components/public/ErrorBoundary';
 import { TaskProvider } from './contexts/TaskProvider';
+import Search from './pages/Public/Search';
 
 function App() {
   return (
@@ -20,18 +21,21 @@ function App() {
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/" element={<Navigate to="/analytics" replace />} />
-                
+
                 {/* Admin Routes */}
                 <Route element={<RoleBasedRoute allowedRoles={['admin']} />}>
                   <Route path="/admin/upload" element={<Upload />} />
                   {/* <Route path="/admin/dashboard" element={<Dashboard />} /> */}
                 </Route>
                 
-                {/* <Route path="*" element={<Navigate to="/unauthorized" replace />} /> */}
+                <Route path="*" element={<Navigate to="/unauthorized" replace />} />
                 
                 {/* Analytics - Available to all authenticated users */}
                 <Route element={<PrivateRoute />}>
                   <Route path="/analytics" element={<AnalyticsDashboard />} />
+                </Route>
+                <Route element={<PrivateRoute />}>
+                  <Route path="/search" element={<Search />} />
                 </Route>
                 
                 <Route path="/unauthorized" element={<div className='text-red-500 flex justify-center text-2xl font-semibold'>Access Denied</div>} />
