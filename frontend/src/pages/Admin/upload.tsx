@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useTask } from '../../hooks/useTask';
 
 export default function Upload() {
@@ -10,6 +10,7 @@ export default function Upload() {
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const navigate = useNavigate();
 
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== 'admin') return <Navigate to="/unauthorized" replace />;
@@ -27,8 +28,8 @@ export default function Upload() {
       const token = localStorage.getItem('authToken');
       if (!token) throw new Error('Not authenticated');
 
-      setTask({ 
-        taskId: null, 
+      setTask({
+        taskId: null,
         status: 'uploading',
         error: null,
         progress: { current: 0, total: 100, message: 'Uploading file...' }
@@ -36,9 +37,7 @@ export default function Upload() {
 
       const response = await fetch('http://localhost:8000/api/upload/upload', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
@@ -46,20 +45,23 @@ export default function Upload() {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const data = await response.json();
-      setMessage(data.message || 'Upload accepted');
 
       if (data.task_id) {
-        setTask({ 
-          taskId: data.task_id, 
+        setTask({
+          taskId: data.task_id,
           status: 'processing',
           error: null,
           progress: { current: 0, total: 100, message: 'Starting processing...' }
         });
+
+        // Immediately redirect to homepage
+        navigate('/');
       }
 
-      // Reset state for next file
+      // Reset state for next upload
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+
     } catch (err) {
       setMessage(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setTask({
@@ -70,6 +72,7 @@ export default function Upload() {
       });
     }
   };
+
 
   return (
     <div className="bg-gray-50 flex items-center justify-center">
