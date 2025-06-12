@@ -97,12 +97,13 @@ export default function Histogram({
     },
     xAxis: {
       type: "category" as const,
+      name: "Transaction Amount",
       data: data.map((d) => d.interval),
       axisLabel: { rotate: 45 },
     },
     yAxis: {
       type: "value" as const,
-      name: "Amount",
+      name: "Number of Transactions",
     },
     series: seriesData.map((s) => ({
       name: s.name,
