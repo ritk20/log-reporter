@@ -185,7 +185,7 @@ def get_hour_interval_stats(collection: Collection):
             }
         buckets[bucket_start]["transaction_count"] += 1
         err_code = doc["ErrorCode"]
-        if err_code.lower() != "no error":
+        if err_code.lower() != "success":
             buckets[bucket_start]["error_count"] += 1
         buckets[bucket_start]["total_amount"] += doc["input_amount"]
         buckets[bucket_start]["total_time"] += doc["Time_to_Transaction_secs"]

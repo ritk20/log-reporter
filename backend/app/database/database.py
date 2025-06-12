@@ -74,8 +74,6 @@ async def close_mongo_connection():
 def initialize_collections():
     """Ensure collections are initialized and created if they don't exist."""
     try:
-        
-
         db = mongodb.database
         existing_collections = db.list_collection_names()
 
@@ -86,7 +84,7 @@ def initialize_collections():
                 settings.MONGODB_COLLECTION_NAME,
                 timeseries={
                     "timeField": "Request_timestamp",
-                    "metaField": "Msg_id",
+                    "metaField": "Msg_id",  #need to changed to something of less cardinality
                     "granularity": "seconds"
                 }
             )
@@ -94,17 +92,27 @@ def initialize_collections():
         else:
             logger.info(f"Using existing collection '{settings.MONGODB_COLLECTION_NAME}'")
 
+        collection = db[settings.MONGODB_COLLECTION_NAME]
+        mongodb.collection = collection
+        mongodb.collection.create_index({ 'Transaction_Id': 1})
+
         # Create unique index on tokenId for duplicate prevention
         mongodb.token_coll.create_index(
             [("tokenId", 1)], 
             unique=True, 
             background=True,
-            partialFilterExpression={"tokenId": {"$type": "string"}}    #add better null handling
+            partialFilterExpression={"tokenId": {"$type": "string"}}    #better null handling
         )
-        mongodb.token_coll.create_index(
-            [("timestamp", -1)], 
-            background=True
-        )
+        mongodb.token_coll.create_index({ "occurrences.serialNo": 1 })
+        mongodb.token_coll.create_index({ 
+        "occurrences.serialNo": "text",
+        "tokenId": "text" 
+        })
+        mongodb.token_coll.create_index({
+        "occurrences.timestamp": -1,
+        "tokenId": 1,
+        "occurrences.serialNo": 1
+        })
 
         logger.info("MongoDB indexes created successfully")
 

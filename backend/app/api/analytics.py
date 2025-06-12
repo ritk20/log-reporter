@@ -1,7 +1,7 @@
 # app/api/analytics.py
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pymongo import MongoClient
+from pymongo import MongoClient, ASCENDING
 from app.core.config import settings
 from app.api.analytics_service import aggregate_daily_summary, aggregate_overall_summary
 import datetime
@@ -76,3 +76,35 @@ async def get_analytics(date: str = Query(..., description="YYYY-MM-DD or 'all'"
     except Exception as e:
         logging.error(f"Error in get_analytics: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+    
+@router.get("/range", tags=["Analytics"])
+async def get_analytics_range(
+    from_date: str = Query(..., description="Start date in YYYY-MM-DD"),
+    to_date:   str = Query(..., description="End date in YYYY-MM-DD"),
+    auth: dict = Depends(verify_token)
+):
+    """
+    Fetch daily summary documents between from_date and to_date (inclusive).
+    Returns a list of objects: [{ date: "...", ...summary fields... }, ...].
+    """
+    
+    query = {
+        "date": {"$gte": from_date, "$lte": to_date}
+    }
+    projection = {
+        "_id": 0,
+        "date": 1,
+        # we expect summary under "summary"
+        "summary": 1
+    }
+    cursor = daily_collection.find(query, projection).sort("date", ASCENDING)
+    results = []
+    async for doc in cursor:
+        if "summary" not in doc or not isinstance(doc["summary"], dict):
+            # skip or return empty?
+            continue
+        entry = {"date": doc["date"], **doc["summary"]}
+        results.append(entry)
+    if not results:
+        raise HTTPException(status_code=404, detail=f"No daily summaries found between {from_date} and {to_date}")
+    return {"data": results}
