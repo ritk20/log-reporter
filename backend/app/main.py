@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.database.database import connect_to_mongo, close_mongo_connection
 from app.api.analytics import router as analytics_router
 from app.api.temporal import router as temporal_router
+from app.api.search import router as search_router
 
 import logging
 
@@ -41,6 +42,7 @@ app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(analytics_router)
 app.include_router(temporal_router)
+app.include_router(search_router)
 import logging
 
 @app.get("/health")

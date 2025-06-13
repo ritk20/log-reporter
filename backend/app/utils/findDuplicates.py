@@ -40,6 +40,7 @@ def detect_duplicate_tokens(db_client, time_period_value, time_period_unit):
                 "occurances": {
                     "$push": {
                         "Transaction_Id": "$transactionId",
+                        "serialNo":"$serialNo",
                         "SenderOrgID": "$bankId",
                         "ReceiverOrgID": "$receiverBankId",
                         "amount": {"$toDouble": "$value"},
