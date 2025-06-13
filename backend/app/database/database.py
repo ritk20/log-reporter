@@ -74,8 +74,6 @@ async def close_mongo_connection():
 def initialize_collections():
     """Ensure collections are initialized and created if they don't exist."""
     try:
-        
-
         db = mongodb.database
         existing_collections = db.list_collection_names()
 
@@ -94,17 +92,36 @@ def initialize_collections():
         else:
             logger.info(f"Using existing collection '{settings.MONGODB_COLLECTION_NAME}'")
 
-        # Create unique index on tokenId for duplicate prevention
+        # Check if the 'timestamp_-1' index already exists
+        existing_indexes = mongodb.token_coll.index_information()
+        if 'timestamp_-1' not in existing_indexes:
+            mongodb.token_coll.create_index(
+                [("timestamp", -1)],
+                background=True,
+                name="timestamp_desc"
+            )
+            logger.info("Created 'timestamp_desc' index.")
+        else:
+            logger.info("'timestamp_-1' index already exists, skipping creation.")
+
+        # Create other indexes
         mongodb.token_coll.create_index(
-            [("tokenId", 1)], 
-            unique=True, 
+            [("occurrences.serialNo", 1)],
+            unique=False,
             background=True,
-            partialFilterExpression={"tokenId": {"$type": "string"}}    #add better null handling
+            name="serialNo_unique"
         )
-        mongodb.token_coll.create_index(
-            [("timestamp", -1)], 
-            background=True
-        )
+
+        # Create the 'tokenId' index if it doesn't already exist
+        if 'tokenId_unique_string' not in existing_indexes:
+            mongodb.token_coll.create_index(
+                [("tokenId", 1)],
+                unique=True,
+                background=True,
+                partialFilterExpression={"tokenId": {"$type": "string"}},
+                name="tokenId_unique_string"
+            )
+            logger.info("Created 'tokenId_unique_string' index.")
 
         logger.info("MongoDB indexes created successfully")
 

@@ -142,6 +142,16 @@ def get_cross_type_operation(collection: Collection):
         o = r["_id"].get("operation", "UNKNOWN")
         cross[t][o] = r["count"]
     return cross
+def  get_cross_operation_type(collection: Collection):
+    pipeline = [{"$group": {"_id": {"operation": "$Operation", "type": "$Type_Of_Transaction"}, "count": {"$sum": 1}}}]
+    results = list(collection.aggregate(pipeline))
+    cross = defaultdict(dict)
+    for r in results:
+        o = r["_id"].get("operation", "UNKNOWN")
+        t = r["_id"].get("type", "UNKNOWN")
+        cross[o][t] = r["count"]
+    return cross
+
 def get_cross_type_error(collection: Collection):
     pipeline = [{"$group": {"_id": {"type": "$Type_Of_Transaction", "error": "$ErrorCode"}, "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
@@ -304,6 +314,7 @@ def aggregate_daily_summary(collection, daily_collection):
     result_counts = get_result_counts(collection)
     bucket_docs, total_transactions, success_rate, avg_processing_time = get_amount_buckets(collection)
     cross_type_op = get_cross_type_operation(collection)
+    cross_op_type = get_cross_operation_type(collection)
     cross_type_error = get_cross_type_error(collection)
     cross_op_error = get_cross_operation_error(collection)
     processing_time_by_inputs = get_processing_time_by_inputs(collection)
@@ -350,6 +361,7 @@ def aggregate_daily_summary(collection, daily_collection):
             "successRate": success_rate * 100,
             "averageProcessingTime": avg_processing_time,
             "crossTypeOp": cross_type_op,
+            "crossOpType": cross_op_type,
             "crossTypeError": cross_type_error,
             "crossOpError": cross_op_error,
             "processingTimeByInputs": processing_time_by_inputs,
@@ -449,7 +461,14 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
     total_transactions = 0
     total_success = 0
     total_processing_time = 0
+    merged_transaction_amount_intervals = defaultdict(lambda: {
+    "total": 0,
+    "load": 0,
+    "transfer": 0,
+    "redeem": 0
+})
     cross_type_op = defaultdict(lambda: defaultdict(int))
+    cross_op_type = defaultdict(lambda: defaultdict(int))
     cross_type_error = defaultdict(lambda: defaultdict(int))
     cross_op_error = defaultdict(lambda: defaultdict(int))
     processing_time_by_inputs = defaultdict(list)
@@ -483,10 +502,25 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
         for r, count in summary.get("result", {}).items():
             result_counts[r] += count
 
+        for x in summary.get("mergedTransactionAmountIntervals",[]):
+            interval = x.get("interval")
+            if interval:
+            # Add the values to the aggregated totals for the corresponding interval
+                merged_transaction_amount_intervals[interval]["total"] += x.get("total", 0)
+                merged_transaction_amount_intervals[interval]["load"] += x.get("load", 0)
+                merged_transaction_amount_intervals[interval]["transfer"] += x.get("transfer", 0)
+                merged_transaction_amount_intervals[interval]["redeem"] += x.get("redeem", 0)
+            
+
         # Aggregate cross-type operation counts
         for t, op_dict in summary.get("crossTypeOp", {}).items():
             for op, count in op_dict.items():
                 cross_type_op[t][op] += count
+        # Aggregate cross-operation type counts
+        for op, t_dict in summary.get("crossOpType", {}).items():
+            for t, count in t_dict.items():
+                cross_op_type[op][t] += count
+                
         
         # Aggregate cross-type error counts
         for t, err_dict in summary.get("crossTypeError", {}).items():
@@ -551,25 +585,25 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
     summary_doc = {
         "start_time": start_date,
         "end_time": end_date,
-        "summary": {
-            "type": dict(type_counts),
-            "operation": dict(operation_counts),
-            "error": dict(error_counts),
-            "errorDocs": error_docs,
-            "result": dict(result_counts),
-            "mergedTransactionAmountIntervals": [],  # You can implement interval calculation if needed
-            "total": total_transactions,
-            "successRate": success_rate,
-            "averageProcessingTime": avg_processing_time,
-            "crossTypeOp": cross_type_op,
-            "crossTypeError": cross_type_error,
-            "crossOpError": cross_op_error,
-            "processingTimeByInputs": processing_time_by_inputs,
-            "processingTimeByOutputs": processing_time_by_outputs,
-            "duplicateTokens": merged_token_list,
-            "temporal": temporal,
-            # **transaction_stats
-        }
+        "type": dict(type_counts),
+        "operation": dict(operation_counts),
+        "error": dict(error_counts),
+        "errorDocs": error_docs,
+        "result": dict(result_counts),
+        "mergedTransactionAmountIntervals": merged_transaction_amount_intervals, 
+        "total": total_transactions,
+        "successRate": success_rate,
+        "averageProcessingTime": avg_processing_time,
+        "crossTypeOp": cross_type_op,
+        "crossOpType": cross_op_type,
+        "crossTypeError": cross_type_error,
+        "crossOpError": cross_op_error,                
+        "processingTimeByInputs": processing_time_by_inputs,
+        "processingTimeByOutputs": processing_time_by_outputs,
+        "duplicateTokens": merged_token_list,
+        "temporal": temporal,
+        # **transaction_stats
+    
     }
 
     return summary_doc
