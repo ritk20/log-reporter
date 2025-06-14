@@ -69,6 +69,23 @@
       "ISSUE": 30
     }
   },
+  "crossOpType": {
+    "SPLIT": {
+      "LOAD": 150,
+      "TRANSFER": 120,
+      "REDEEM": 80
+    },
+    "MERGE": {
+      "LOAD": 180,
+      "TRANSFER": 100,
+      "REDEEM": 1
+    },
+    "ISSUE": {
+      "LOAD": 100,
+      "TRANSFER": 120,
+      "REDEEM": 60
+    }
+  },
   "crossTypeError": {
     "LOAD": {
       "Success": 320,
