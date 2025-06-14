@@ -235,7 +235,7 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
       <div className='p-6'>
         <div className={`grid gap-6 ${chartConfigs.length === 1 ? 'grid-cols-1' : chartConfigs.length === 2 ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-1 lg:grid-cols-2'}`}>
           {chartConfigs.map((config) => {
-            const { dates, series, allSeries } = getChartData(config);
+            const { dates, series } = getChartData(config);
             
             const option = {
               title: { 
@@ -246,7 +246,8 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
               tooltip: { trigger: 'axis' },
               legend: { 
                 top: 35,
-                type: 'scroll'
+                type: 'scroll',
+                icon: 'rect'
               },
               xAxis: {
                 type: 'category',
@@ -372,36 +373,6 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
                       </select>
                     </div>
                   </div>
-
-                  {/* Category Selection */}
-                  {(config.groupBy === 'type' || config.groupBy === 'operation' || config.groupBy === 'error') && (
-                    <div className="mt-4">
-                      <label className="text-sm font-medium text-gray-700 block mb-2">Categories</label>
-                      <div className="flex flex-wrap gap-2">
-                        {allSeries.map(s => (
-                          <label key={s.name} className="inline-flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={config.enabledCats.includes(s.name)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  updateChartConfig(config.id, {
-                                    enabledCats: [...config.enabledCats, s.name]
-                                  });
-                                } else {
-                                  updateChartConfig(config.id, {
-                                    enabledCats: config.enabledCats.filter(x => x !== s.name)
-                                  });
-                                }
-                              }}
-                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-2"
-                            />
-                            <span className="text-sm text-gray-700">{s.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Chart Content */}

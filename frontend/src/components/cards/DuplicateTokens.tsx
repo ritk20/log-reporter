@@ -1,13 +1,13 @@
-// DuplicateTokens.tsx - Professional card-based design
 import { useState } from 'react';
 
 import type { DuplicateToken } from '../../types/data';
 
 interface DuplicateTokensTableProps {
   data: DuplicateToken[];
+  total: number;
 }
 
-export default function DuplicateTokensTable({ data }: DuplicateTokensTableProps) {
+export default function DuplicateTokensTable({ data, total }: DuplicateTokensTableProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [sortBy, setSortBy] = useState<'count' | 'amount' | 'firstSeen' | 'lastSeen'>('count');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -89,7 +89,7 @@ export default function DuplicateTokensTable({ data }: DuplicateTokensTableProps
           <div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Duplicate Token Analysis</h3>
             <p className="text-gray-600">
-              Found {data.length} tokens with duplicates across {data.reduce((acc, dt) => acc + dt.count, 0)} transactions
+              Found {data.length} tokens with duplicates across {total} transactions
             </p>
           </div>
           

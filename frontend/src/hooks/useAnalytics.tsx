@@ -1,11 +1,9 @@
-// useAnalytics.tsx - Modified to accept query object instead of date string
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { TxSummary } from '../types/data';
 
 interface QueryParams {
   date?: string;
-  startDate?: string;
-  endDate?: string;
+  range?: string;
   relative?: string;
 }
 
@@ -26,6 +24,20 @@ export function useAnalytics(queryParams: QueryParams) {
       setIsLoading(true);
       setError(null);
 
+      const query = new URLSearchParams();
+      
+      if (queryParams.date) {
+        query.append('date', queryParams.date);
+      }
+      if (queryParams.range) {
+        query.append('range', queryParams.range);
+      }
+      if (queryParams.relative) {
+        query.append('relative', queryParams.relative);
+      }
+
+      const queryString = query.toString();
+      
       // Check cache first
       if (cache.current.has(queryString)) {
         setData(cache.current.get(queryString)!);

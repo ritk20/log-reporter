@@ -168,7 +168,7 @@ export default function ErrorAnalysisCard({ errorData }: ErrorAnalysisProps) {
         {/* <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"> */}
           {/* Cross Tabulation Chart */}
           <div className="lg:col-span-2">
-            <div className="h-80">
+            <div className="h-102">
               <EChartsReact 
                 option={getCrossTabChartOptions()} 
                 style={{ height: '100%', width: '100%' }}
@@ -177,7 +177,7 @@ export default function ErrorAnalysisCard({ errorData }: ErrorAnalysisProps) {
           </div>
 
           {/* Error Summary Panel */}
-          <div className="lg:col-span-1 mt-4">
+          <div className="lg:col-span-1 mt-5">
           <div className="bg-gray-50 rounded-lg p-4">
             <h4 className="text-md font-semibold text-gray-900 mb-4">Error Summary</h4>
 
