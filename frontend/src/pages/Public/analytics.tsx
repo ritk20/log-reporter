@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import '../../components/charts/echartsSetup.ts'
-import PieChart from '../../components/charts/Pie.tsx';
 import ScatterChart from '../../components/charts/Scatter.tsx';
 import Histogram from '../../components/charts/Histogram.tsx';
 import DuplicateTokensTable from '../../components/cards/DuplicateTokens.tsx';
@@ -15,6 +14,7 @@ import { LoadingSpinner } from '../../components/public/Loading.tsx';
 import TemporalDashboard from '../../components/charts/TimeSeries.tsx';
 import ErrorAnalysisCard from '../../components/cards/ErrorAnalysis.tsx';
 import KPICard from '../../components/public/KPIcards.tsx';
+import DrillDownPieChart from '../../components/charts/Pie.tsx';
 
 //TODO: add timeValue and timeUnit to the API call
 export default function AnalyticsPage() {
@@ -43,16 +43,21 @@ export default function AnalyticsPage() {
   // Initialize from URL params on component mount
   useEffect(() => {
     const dateParam = searchParams.get('date') || 'all';
-    const startParam = searchParams.get('startDate');
-    const endParam = searchParams.get('endDate');
+    const rangeParam = searchParams.get('range');
     const relativeParam = searchParams.get('relative');
 
-    let initialFilters;
-    if (startParam && endParam) {
+    let initialFilters: {
+      type: 'all' | 'single' | 'range' | 'relative';
+      startDate: string;
+      endDate: string;
+      relativePeriod: string;
+    };
+    if (rangeParam) {
+      const [start, end] = rangeParam.split(':');
       initialFilters = {
         type: 'range' as const,
-        startDate: startParam,
-        endDate: endParam,
+        startDate: start,
+        endDate: end,
         relativePeriod: 'last7days'
       };
     } else if (relativeParam) {
@@ -82,16 +87,64 @@ export default function AnalyticsPage() {
     setSelectedFilters(initialFilters);
   }, [searchParams]); // Only run on mount
 
+  const calculateRelativeDates = (period: string): { startDate: string; endDate: string } => {
+    const today = new Date();
+    const utcToday = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+    const end = utcToday.toISOString().split('T')[0];
+    let start = new Date();
+
+    switch (period) {
+      case 'last24hours':
+        start.setDate(utcToday.getDate() - 1);
+        break;
+      case 'last7days':
+        start.setDate(utcToday.getDate() - 7);
+        break;
+      case 'last30days':
+        start.setDate(utcToday.getDate() - 30);
+        break;
+      case 'last90days':
+        start.setDate(utcToday.getDate() - 90);
+        break;
+      case 'thisweek':
+        start.setDate(utcToday.getDate() - utcToday.getDay());
+        break;
+      case 'lastweek':
+        start.setDate(utcToday.getDate() - utcToday.getDay() - 7);
+        return {
+          startDate: start.toISOString().split('T')[0],
+          endDate: new Date(utcToday.setDate(utcToday.getDate() - utcToday.getDay() - 1)).toISOString().split('T')[0]
+        };
+      case 'thismonth':
+        start = new Date(utcToday.getFullYear(), utcToday.getMonth(), 1);
+        break;
+      case 'lastmonth':
+        start = new Date(utcToday.getFullYear(), utcToday.getMonth() - 1, 1);
+        return {
+          startDate: start.toISOString().split('T')[0],
+          endDate: new Date(utcToday.getFullYear(), utcToday.getMonth(), 0).toISOString().split('T')[0]
+        };
+      default:
+        start.setDate(utcToday.getDate() - 7);
+    }
+    
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end
+    };
+  };
 
   // Convert applied filters to API query parameters
   const getQueryParams = () => {
     switch (appliedFilters.type) {
       case 'range':
-        return { startDate: appliedFilters.startDate, endDate: appliedFilters.endDate };
+        return { date: `${appliedFilters.startDate}:${appliedFilters.endDate}` };
       case 'single':
         return { date: appliedFilters.startDate };
-      case 'relative':
-        return { relative: appliedFilters.relativePeriod };
+      case 'relative': {
+        const { startDate, endDate } = calculateRelativeDates(appliedFilters.relativePeriod);
+        return { date: `${startDate}:${endDate}` };
+      }
       default:
         return { date: 'all' };
     }
@@ -121,26 +174,29 @@ export default function AnalyticsPage() {
     setAppliedFilters({ ...selectedFilters });
 
     // Update URL params for deep linking
-    const params = new URLSearchParams();
-    switch (selectedFilters.type) {
-      case 'range':
-        if (selectedFilters.startDate && selectedFilters.endDate) {
-          params.set('startDate', selectedFilters.startDate);
-          params.set('endDate', selectedFilters.endDate);
-        }
-        break;
-      case 'single':
-        if (selectedFilters.startDate) {
-          params.set('date', selectedFilters.startDate);
-        }
-        break;
-      case 'relative':
-        params.set('relative', selectedFilters.relativePeriod);
-        break;
-      default:
-        params.set('date', 'all');
-    }
-    setSearchParams(params);
+  const params = new URLSearchParams();
+  switch (selectedFilters.type) {
+    case 'range':
+      if (selectedFilters.startDate && selectedFilters.endDate) {
+        // FIX: Use single parameter for range
+        params.set('range', `${selectedFilters.startDate}:${selectedFilters.endDate}`);
+      }
+      break;
+    case 'single':
+      if (selectedFilters.startDate) {
+        params.set('date', selectedFilters.startDate);
+      }
+      break;
+    case 'relative':
+      { params.set('relative', selectedFilters.relativePeriod);
+      const { startDate, endDate } = calculateRelativeDates(selectedFilters.relativePeriod);
+      params.set('range', `${startDate}:${endDate}`);
+      break; }
+    default:
+      params.set('date', 'all');
+  }
+  setSearchParams(params);
+
   };
 
   // Reset filters
@@ -167,13 +223,6 @@ export default function AnalyticsPage() {
     if (!data) {
       return <div className="text-center p-4">No data available</div>;
     }
-
-    const transformPieData = (data: Record<string, number>) => {
-      return Object.entries(data).map(([name, value]) => ({
-        name,
-        value: typeof value === 'number' ? value : 0
-      }));
-    };
 
     const handleDownloadPDF = () => {
     // Hide the download button before printing
@@ -523,23 +572,19 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Pie Charts Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Types Distribution</h3>
-                </div>
-                <div className="p-6 flex-1">
-                  <PieChart data={transformPieData(data.type)} />
-                </div>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Operations Distribution</h3>
-                </div>
-                <div className="p-6 flex-1">
-                  <PieChart data={transformPieData(data.operation)} />
-                </div>
-              </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <DrillDownPieChart
+                data={data.crossTypeOp}
+                title="Transaction Types"
+                colorScheme="blue"
+              />
+              
+              <DrillDownPieChart
+                data={data.crossOpType}
+                title="Transaction Operations"
+                colorScheme='purple'
+              />
             </div>
           </div>
 
@@ -575,7 +620,7 @@ export default function AnalyticsPage() {
             <h3 className="text-lg font-semibold text-gray-900">Duplicate Tokens Analysis</h3>
           </div>
           <div className="p-6">
-            <DuplicateTokensTable data={data.duplicateTokens} />
+            <DuplicateTokensTable data={data.duplicateTokens} total={data.total}/>
           </div>
         </div>
 
