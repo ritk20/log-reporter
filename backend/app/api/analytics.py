@@ -1,12 +1,10 @@
-# app/api/analytics.py
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pymongo import MongoClient, ASCENDING
 from app.core.config import settings
 from app.api.analytics_service import aggregate_daily_summary, aggregate_summary_by_date_range
 from datetime import datetime
-from app.api.auth_jwt import verify_token 
-from dateutil.relativedelta import relativedelta
+from app.api.auth_jwt import verify_token
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
@@ -37,7 +35,7 @@ async def get_latest_date(auth : dict = Depends(verify_token)):
         raise HTTPException(status_code=404, detail="No daily summaries found")
     
     # Convert date to string format if it's a datetime object
-    if isinstance(latest_doc["date"], datetime.datetime):
+    if isinstance(latest_doc["date"], datetime):
         date_str = latest_doc["date"].strftime("%Y-%m-%d")
     else:
         date_str = latest_doc["date"]
@@ -56,38 +54,41 @@ async def get_analytics(
     logging.info(f"Fetching analytics for date: {date}")
     try:
         # 1) All-Time summary
-        # if date.lower() == "all":
-        #     doc = overall_collection.find_one(
-        #         {"_id": "overall_summary"}, 
-        #         {"_id": 0}
-        #     )
-        #     if not doc:
-        #         raise HTTPException(status_code=404, detail="Overall summary not found")
-        #     return doc
         if date.lower() == "all":
-            end_date=datetime.strptime(datetime.today().strftime('%Y-%m-%d'), '%Y-%m-%d')
-            start_date = end_date - relativedelta(months=3)
+            doc = overall_collection.find_one(
+                {"_id": "overall_summary"}, 
+                {"_id": 0}
+            )
+            if not doc:
+                raise HTTPException(status_code=404, detail="Overall summary not found")
+            return doc
+        # if date.lower() == "all":
+        #     end_date=datetime.strptime(datetime.today().strftime('%Y-%m-%d'), '%Y-%m-%d')
+        #     start_date = end_date - relativedelta(months=3)
             
-            summary_doc= aggregate_summary_by_date_range(daily_collection, start_date, end_date)   
-            del summary_doc["start_time"]
-            del summary_doc["end_time"]
-            summary_doc["timeline"]="all"
-            return summary_doc
+        #     summary_doc= aggregate_summary_by_date_range(daily_collection, start_date, end_date)   
+        #     del summary_doc["start_time"]
+        #     del summary_doc["end_time"]
+        #     summary_doc["timeline"]="all"
+        #     return summary_doc
+
+
         # 2) Date range (start_date:end_date)
         if ":" in date:
-            start_date, end_date = date.split(":")
+            # FIX: Correctly split the date range
+            parts = date.split(":")
+            if len(parts) != 2:
+                raise HTTPException(status_code=400, detail="Invalid date range format. Use 'YYYY-MM-DD:YYYY-MM-DD'")
+            
             try:
-                # Ensure the date format is valid
-                start_date = datetime.strptime(start_date, "%Y-%m-%d")
-                end_date = datetime.strptime(end_date, "%Y-%m-%d")
+                start_date = datetime.strptime(parts[0], "%Y-%m-%d")
+                end_date = datetime.strptime(parts[1], "%Y-%m-%d")
                 logging.info(f"Fetching analytics for date range: {start_date} to {end_date}")
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD for both dates.")
-
-
+                
+            # FIX: Return the aggregated summary
             return aggregate_summary_by_date_range(daily_collection, start_date, end_date)
-            
-# 
         
         # 3) Daily summary
         # Query daily_summary
@@ -96,10 +97,9 @@ async def get_analytics(
             {"_id": 0, "summary": 1}
         )
         if doc and "summary" in doc:
-            doc = doc["summary"]
+            return doc["summary"]
         if not doc:
             raise HTTPException(status_code=404, detail=f"No data found for {date}")
-        return doc
 
     except Exception as e:
         logging.error(f"Error in get_analytics: {str(e)}", exc_info=True)

@@ -5,12 +5,13 @@ import re
 from datetime import datetime, timedelta
 from app.api.auth_jwt import verify_token
 from app.core.config import settings
+from app.database.database import get_collection
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
 client = MongoClient(settings.MONGODB_URL)
 db = client[settings.MONGODB_DB_NAME]
-collection = db[settings.MONGODB_TOKENS_COLLECTION_NAME]
+tokens_collection = db[settings.MONGODB_TOKENS_COLLECTION_NAME]
 
 @router.get("/tokens")
 async def search_tokens(
@@ -20,92 +21,73 @@ async def search_tokens(
     date_filter: Optional[str] = Query(None, description="Date filter (YYYY-MM-DD or 'all')"),
     auth: dict = Depends(verify_token)
 ):
-    """Search tokens by tokenId with fuzzy matching"""
+    """Search tokens by tokenId with expanded occurrences."""
     try:
-        # Build search pipeline
         pipeline = []
-        
-        # Date filtering
         match_stage = {}
+
+        # Date filtering
         if date_filter and date_filter != "all":
             try:
                 filter_date = datetime.strptime(date_filter, "%Y-%m-%d")
-                start_date = filter_date
-                end_date = filter_date + timedelta(days=1)
-                
-                match_stage["occurrences.timestamp"] = {
-                    "$gte": start_date,
-                    "$lt": end_date
-                }
+                start_date = filter_date.replace(tzinfo=None)
+                end_date = (filter_date + timedelta(days=1)).replace(tzinfo=None)
+                match_stage["occurrences.timestamp"] = {"$gte": start_date, "$lt": end_date}
             except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid date format")
-        
-        # Fuzzy search for tokenId
-        if len(query) >= 8:  # Minimum length for meaningful token search
-            # Exact match first, then fuzzy
-            token_regex = re.compile(re.escape(query), re.IGNORECASE)
-            match_stage["tokenId"] = {"$regex": token_regex}
-        else:
-            # For shorter queries, use text search
-            match_stage["$text"] = {"$search": query}
-        
-        if match_stage:
-            pipeline.append({"$match": match_stage})
-        
-        # Add search score for text search
-        if "$text" in match_stage:
-            pipeline.append({"$addFields": {"searchScore": {"$meta": "textScore"}}})
-            pipeline.append({"$sort": {"searchScore": {"$meta": "textScore"}}})
-        else:
-            pipeline.append({"$sort": {"_id": -1}})
-        
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+        # Token ID search
+        token_regex = re.compile(f"^{re.escape(query)}", re.IGNORECASE)
+        match_stage["tokenId"] = {"$regex": token_regex}
+
+        pipeline.append({"$match": match_stage})
+
+        # Unwind occurrences
+        pipeline.append({"$unwind": "$occurrences"})
+
+        # Re-apply date filter post-unwind
+        if date_filter and date_filter != "all":
+            pipeline.append({"$match": {"occurrences.timestamp": {"$gte": start_date, "$lt": end_date}}})
+
         # Count total results
-        count_pipeline = pipeline.copy()
-        count_pipeline.append({"$count": "total"})
-        total_result = list(collection.aggregate(count_pipeline))
+        count_pipeline = pipeline + [{"$count": "total"}]
+        total_result = list(tokens_collection.aggregate(count_pipeline))
         total = total_result[0]["total"] if total_result else 0
-        
-        # Add pagination
+
+        # Sorting and pagination
         pipeline.extend([
+            {"$sort": {"occurrences.timestamp": -1}},
             {"$skip": (page - 1) * limit},
             {"$limit": limit}
         ])
-        
+
         # Execute search
-        results = list(collection.aggregate(pipeline))
-        
-        # Process results for frontend
-        processed_results = []
-        for doc in results:
-            processed_results.append({
-                "id": str(doc["_id"]),
+        results = list(tokens_collection.aggregate(pipeline))
+
+        # Format results
+        processed_results = [
+            {
                 "tokenId": doc["tokenId"],
-                "occurrenceCount": len(doc.get("occurrences", [])),
-                "totalAmount": sum(float(occ.get("amount", 0)) for occ in doc.get("occurrences", [])),
-                "latestTransaction": max(
-                    (occ.get("timestamp") for occ in doc.get("occurrences", [])),
-                    default=None
-                ),
-                "organizations": list(set(
-                    occ.get("senderOrg", "") for occ in doc.get("occurrences", []) 
-                    if occ.get("senderOrg")
-                )),
-                "searchScore": doc.get("searchScore", 0)
-            })
-        
+                "serialNo": doc["occurrences"].get("serialNo"),
+                "amount": doc["occurrences"].get("amount"),
+                "currency": doc["occurrences"].get("currency"),
+                "timestamp": doc["occurrences"].get("timestamp"),
+                "senderOrg": doc["occurrences"].get("senderOrg"),
+                "receiverOrg": doc["occurrences"].get("receiverOrg"),
+                "transactionId": doc["occurrences"].get("Transaction_Id"),
+                "msgId": doc["occurrences"].get("Msg_id")
+            }
+            for doc in results
+        ]
+
         return {
             "results": processed_results,
-            "pagination": {
-                "page": page,
-                "limit": limit,
-                "total": total,
-                "pages": (total + limit - 1) // limit
-            },
+            "pagination": {"page": page, "limit": limit, "total": total, "pages": (total + limit - 1) // limit},
             "query": query
         }
-        
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Token search failed: {str(e)}")
 
 @router.get("/serial-numbers")
 async def search_serial_numbers(
@@ -115,126 +97,153 @@ async def search_serial_numbers(
     date_filter: Optional[str] = Query(None, description="Date filter (YYYY-MM-DD or 'all')"),
     auth: dict = Depends(verify_token)
 ):
-    """Search by serial number within occurrences"""
+    """Search by serial number within occurrences."""
     try:
         pipeline = []
-        
-        # Match stage
-        match_stage = {"occurrences.serialNo": {"$regex": re.compile(re.escape(query), re.IGNORECASE)}}
-        
+        match_stage = {}
+
         # Date filtering
         if date_filter and date_filter != "all":
             try:
                 filter_date = datetime.strptime(date_filter, "%Y-%m-%d")
-                start_date = filter_date
-                end_date = filter_date + timedelta(days=1)
-                
-                match_stage["occurrences.timestamp"] = {
-                    "$gte": start_date,
-                    "$lt": end_date
-                }
+                start_date = filter_date.replace(tzinfo=None)
+                end_date = (filter_date + timedelta(days=1)).replace(tzinfo=None)
+                match_stage["occurrences.timestamp"] = {"$gte": start_date, "$lt": end_date}
             except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid date format")
-        
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+        # Serial number search
+        serial_regex = re.compile(f"^{re.escape(query)}", re.IGNORECASE)
+        match_stage["occurrences.serialNo"] = {"$regex": serial_regex}
+
         pipeline.extend([
             {"$match": match_stage},
             {"$unwind": "$occurrences"},
-            {"$match": {
-                "occurrences.serialNo": {"$regex": re.compile(re.escape(query), re.IGNORECASE)}
-            }}
+            {"$match": {"occurrences.serialNo": {"$regex": serial_regex}}}
         ])
-        
-        # Add date filter for unwound documents if needed
+
+        # Re-apply date filter post-unwind
         if date_filter and date_filter != "all":
-            pipeline.append({
-                "$match": {
-                    "occurrences.timestamp": {
-                        "$gte": start_date,
-                        "$lt": end_date
-                    }
-                }
-            })
-        
+            pipeline.append({"$match": {"occurrences.timestamp": {"$gte": start_date, "$lt": end_date}}})
+
         # Count total results
-        count_pipeline = pipeline.copy()
-        count_pipeline.append({"$count": "total"})
-        total_result = list(collection.aggregate(count_pipeline))
+        count_pipeline = pipeline + [{"$count": "total"}]
+        total_result = list(tokens_collection.aggregate(count_pipeline))
         total = total_result[0]["total"] if total_result else 0
-        
-        # Add sorting and pagination
+
+        # Sorting and pagination
         pipeline.extend([
             {"$sort": {"occurrences.timestamp": -1}},
             {"$skip": (page - 1) * limit},
             {"$limit": limit}
         ])
-        
+
         # Execute search
-        results = list(collection.aggregate(pipeline))
-        
-        # Process results
-        processed_results = []
-        for doc in results:
-            occ = doc["occurrences"]
-            processed_results.append({
+        results = list(tokens_collection.aggregate(pipeline))
+
+        # Format results
+        processed_results = [
+            {
                 "tokenId": doc["tokenId"],
-                "serialNo": occ["serialNo"],
-                "amount": occ["amount"],
-                "currency": occ["currency"],
-                "timestamp": occ["timestamp"],
-                "senderOrg": occ.get("senderOrg"),
-                "receiverOrg": occ.get("receiverOrg"),
-                "transactionId": occ.get("Transaction_Id"),
-                "msgId": occ.get("Msg_id")
-            })
-        
+                "serialNo": doc["occurrences"].get("serialNo"),
+                "amount": doc["occurrences"].get("amount"),
+                "currency": doc["occurrences"].get("currency"),
+                "timestamp": doc["occurrences"].get("timestamp"),
+                "senderOrg": doc["occurrences"].get("senderOrg"),
+                "receiverOrg": doc["occurrences"].get("receiverOrg"),
+                "transactionId": doc["occurrences"].get("Transaction_Id"),
+                "msgId": doc["occurrences"].get("Msg_id")
+            }
+            for doc in results
+        ]
+
         return {
             "results": processed_results,
-            "pagination": {
-                "page": page,
-                "limit": limit,
-                "total": total,
-                "pages": (total + limit - 1) // limit
-            },
+            "pagination": {"page": page, "limit": limit, "total": total, "pages": (total + limit - 1) // limit},
             "query": query
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Serial number search failed: {str(e)}")
 
-@router.get("/suggestions")
-async def get_search_suggestions(
-    query: str = Query(..., min_length=2, description="Partial search query"),
-    type: str = Query("token", description="Suggestion type: 'token' or 'serial'"),
-    limit: int = Query(5, ge=1, le=10, description="Number of suggestions"),
+@router.get("/transactions")
+async def search_transactions(
+    query: str = Query(..., min_length=3, description="Search query for transaction ID"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(10, ge=1, le=100, description="Results per page"),
+    date_filter: Optional[str] = Query(None, description="Date filter (YYYY-MM-DD or 'all')"),
     auth: dict = Depends(verify_token)
 ):
-    """Get search suggestions for autocomplete"""
+    """Search transactions by Transaction_Id in the master timeseries collection."""
     try:
-        if type == "token":
-            # Token ID suggestions
-            pipeline = [
-                {"$match": {"tokenId": {"$regex": f"^{re.escape(query)}", "$options": "i"}}},
-                {"$project": {"tokenId": 1}},
-                {"$limit": limit}
-            ]
-            results = list(collection.aggregate(pipeline))
-            suggestions = [{"value": doc["tokenId"], "type": "token"} for doc in results]
-            
-        elif type == "serial":
-            # Serial number suggestions
-            pipeline = [
-                {"$unwind": "$occurrences"},
-                {"$match": {"occurrences.serialNo": {"$regex": f"^{re.escape(query)}", "$options": "i"}}},
-                {"$group": {"_id": "$occurrences.serialNo"}},
-                {"$limit": limit}
-            ]
-            results = list(collection.aggregate(pipeline))
-            suggestions = [{"value": doc["_id"], "type": "serial"} for doc in results]
-            
-        else:
-            raise HTTPException(status_code=400, detail="Invalid suggestion type")
-        
-        return {"suggestions": suggestions}
-        
+        master_collection = await get_collection()
+
+        match_stage = {}
+        pipeline = []
+
+        # Date filtering
+        if date_filter and date_filter != "all":
+            try:
+                filter_date = datetime.strptime(date_filter, "%Y-%m-%d").replace(tzinfo=None)
+                start_date = filter_date
+                end_date = (filter_date + timedelta(days=1)).replace(tzinfo=None)
+                match_stage["Request_timestamp"] = {"$gte": start_date, "$lt": end_date}
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+        # Transaction ID search
+        transaction_regex = re.compile(re.escape(query), re.IGNORECASE)
+        match_stage["Transaction_Id"] = {"$regex": transaction_regex}
+
+        pipeline.append({"$match": match_stage})
+
+        # Count total results
+        count_pipeline = pipeline + [{"$count": "total"}]
+        total_result = list(master_collection.aggregate(count_pipeline))
+        total = total_result[0]["total"] if total_result else 0
+
+        # Sorting and pagination
+        pipeline.extend([
+            {"$sort": {"Request_timestamp": -1}},
+            {"$skip": (page - 1) * limit},
+            {"$limit": limit}
+        ])
+
+        # Execute search
+        results = list(master_collection.aggregate(pipeline))
+
+        # Format results
+        processed_results = [
+            {
+                "id": str(doc["_id"]),
+                "transactionId": doc.get("Transaction_Id"),
+                "msgId": doc.get("Msg_id"),
+                "senderOrgId": doc.get("SenderOrgId"),
+                "receiverOrgId": doc.get("ReceiverOrgId"),
+                "amount": doc.get("amount"),
+                "operation": doc.get("Operation"),
+                "type": doc.get("Type_Of_Transaction"),
+                "result": doc.get("Result_of_Transaction"),
+                "errorCode": doc.get("ErrorCode"),
+                "errorMsg": doc.get("ErrorMsg"),
+                "timestamp": doc.get("Request_timestamp"),
+                "responseTimestamp": doc.get("Response_timestamp"),
+                "processingTime": doc.get("Time_to_Transaction_secs"),
+                "inputs": doc.get("Inputs", []),
+                "outputs": doc.get("Outputs", []),
+                "numberOfInputs": doc.get("NumberOfInputs"),
+                "numberOfOutputs": doc.get("NumberOfOutputs"),
+                "inputAmount": doc.get("input_amount"),
+                "outputAmounts": doc.get("Output_amt_list", [])
+            }
+            for doc in results
+        ]
+
+        return {
+            "results": processed_results,
+            "pagination": {"page": page, "limit": limit, "total": total, "pages": (total + limit - 1) // limit},
+            "query": query
+        }
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Suggestions failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Transaction search failed: {str(e)}")
