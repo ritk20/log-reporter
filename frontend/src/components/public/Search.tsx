@@ -1,19 +1,36 @@
 // components/search/SearchComponent.tsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 interface SearchResult {
+  //token ID/Serial No. results
   id?: string;
   tokenId?: string;
   serialNo?: string;
-  occurrenceCount?: number;
-  totalAmount?: number;
-  latestTransaction?: string;
-  organizations?: string[];
   amount?: string;
   currency?: string;
   timestamp?: string;
-  transactionId?: string;
+
+  // Transaction results
+  operation?: string;
+  type?: string;
+  result?: number;
+  errorCode?: string;
+  errorMsg?: string;
+  responseTimestamp?: string;
+  processingTime?: number;
+  inputs?: any[];
+  outputs?: any[];
+  numberOfInputs?: number;
+  numberOfOutputs?: number;
+  inputAmount?: number;
+  outputAmounts?: number[];
+
+  //common
+  transactionId: string;
+  msgId: string;
+  senderOrg: string;
+  receiverOrg: string;
 }
 
 interface SearchComponentProps {
@@ -23,11 +40,9 @@ interface SearchComponentProps {
 export function SearchComponent({ onResultsUpdate }: SearchComponentProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('search') || '');
-  const [searchType, setSearchType] = useState<'token' | 'serial'>('token');
+  const [searchType, setSearchType] = useState<'token' | 'serial' | 'transaction'>('token');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<Array<{value: string, type: string}>>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -51,9 +66,18 @@ export function SearchComponent({ onResultsUpdate }: SearchComponentProps) {
       const token = localStorage.getItem('authToken');
       const dateParam = searchParams.get('date') || 'all';
       
-      const endpoint = searchType === 'token' 
-        ? `/api/search/tokens` 
-        : `/api/search/serial-numbers`;
+      let endpoint = '';
+      switch (searchType) {
+        case 'token':
+          endpoint = '/api/search/tokens';
+          break;
+        case 'serial':
+          endpoint = '/api/search/serial-numbers';
+          break;
+        case 'transaction':
+          endpoint = '/api/search/transactions';
+          break;
+      }
       
       const params = new URLSearchParams({
         query: searchQuery,
@@ -87,99 +111,32 @@ export function SearchComponent({ onResultsUpdate }: SearchComponentProps) {
     }
   };
 
-  // Get search suggestions
-  const getSuggestions = async (searchQuery: string) => {
-    if (searchQuery.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('authToken');
-      const params = new URLSearchParams({
-        query: searchQuery,
-        type: searchType,
-        limit: '5'
-      });
-
-      const response = await fetch(`http://localhost:8000/api/search/suggestions?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setSuggestions(data.suggestions);
-        setShowSuggestions(true);
-      }
-    } catch (error) {
-      console.error('Suggestions error:', error);
-    }
-  };
-
   // Handle search input changes
   const handleInputChange = (value: string) => {
     setQuery(value);
-    
-    // Update URL
-    const params = new URLSearchParams(searchParams);
-    if (value) {
-      params.set('search', value);
-      params.set('search_type', searchType);
-    } else {
-      params.delete('search');
-      params.delete('search_type');
-    }
-    setSearchParams(params);
-
-    // Get suggestions
-    getSuggestions(value);
   };
 
   // Handle search submission
   const handleSearch = (searchQuery?: string) => {
     const finalQuery = searchQuery || query;
-    setShowSuggestions(false);
     performSearch(finalQuery);
   };
 
-  // Handle suggestion selection
-  const handleSuggestionClick = (suggestion: {value: string, type: string}) => {
-    setQuery(suggestion.value);
-    setShowSuggestions(false);
-    handleSearch(suggestion.value);
+  const getPlaceholderText = () => {
+    switch (searchType) {
+      case 'token':
+        return 'Search by Token ID...';
+      case 'serial':
+        return 'Search by Serial Number...';
+      case 'transaction':
+        return 'Search by Transaction ID...';
+      default:
+        return 'Search...';
+    }
   };
 
-  // Effect for URL params
-  useEffect(() => {
-    const searchQuery = searchParams.get('search');
-    const searchTypeParam = searchParams.get('search_type') as 'token' | 'serial';
-    
-    if (searchQuery) {
-      setQuery(searchQuery);
-      if (searchTypeParam) {
-        setSearchType(searchTypeParam);
-      }
-      performSearch(searchQuery);
-    }
-  }, [searchParams]);
-
-  // Click outside handler
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+    <div className="bg-white rounded-lg shadow-sm p-6 mb-6 hover:shadow-md transition-all duration-200">
       <div className="flex flex-col space-y-4">
         {/* Search Header */}
         <div className="flex items-center justify-between">
@@ -189,7 +146,7 @@ export function SearchComponent({ onResultsUpdate }: SearchComponentProps) {
             <select
               value={searchType}
               onChange={(e) => {
-                setSearchType(e.target.value as 'token' | 'serial');
+                setSearchType(e.target.value as 'token' | 'serial' | 'transaction');
                 if (query) {
                   handleSearch();
                 }
@@ -216,7 +173,7 @@ export function SearchComponent({ onResultsUpdate }: SearchComponentProps) {
                     handleSearch();
                   }
                 }}
-                placeholder={`Search by ${searchType === 'token' ? 'Token ID' : 'Serial Number'}...`}
+                placeholder={getPlaceholderText()}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10"
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
@@ -228,21 +185,6 @@ export function SearchComponent({ onResultsUpdate }: SearchComponentProps) {
                   </svg>
                 )}
               </div>
-
-              {/* Suggestions Dropdown */}
-              {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                  {suggestions.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg focus:outline-none focus:bg-blue-50"
-                    >
-                      <span className="text-sm font-mono text-gray-800">{suggestion.value}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
             
             <button

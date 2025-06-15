@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import '../../components/charts/echartsSetup.ts'
-import PieChart from '../../components/charts/Pie.tsx';
 import ScatterChart from '../../components/charts/Scatter.tsx';
 import Histogram from '../../components/charts/Histogram.tsx';
 import DuplicateTokensTable from '../../components/cards/DuplicateTokens.tsx';
@@ -15,6 +14,7 @@ import { LoadingSpinner } from '../../components/public/Loading.tsx';
 import TemporalDashboard from '../../components/charts/TimeSeries.tsx';
 import ErrorAnalysisCard from '../../components/cards/ErrorAnalysis.tsx';
 import KPICard from '../../components/public/KPIcards.tsx';
+import DrillDownPieChart from '../../components/charts/Pie.tsx';
 
 //TODO: add timeValue and timeUnit to the API call
 export default function AnalyticsPage() {
@@ -82,16 +82,62 @@ export default function AnalyticsPage() {
     setSelectedFilters(initialFilters);
   }, [searchParams]); // Only run on mount
 
+  const calculateRelativeDates = (period: string): { startDate: string; endDate: string } => {
+    const today = new Date();
+    const end = today.toISOString().split('T')[0];
+    let start = new Date();
 
+    switch (period) {
+      case 'last24hours':
+        start.setDate(today.getDate() - 1);
+        break;
+      case 'last7days':
+        start.setDate(today.getDate() - 7);
+        break;
+      case 'last30days':
+        start.setDate(today.getDate() - 30);
+        break;
+      case 'last90days':
+        start.setDate(today.getDate() - 90);
+        break;
+      case 'thisweek':
+        start.setDate(today.getDate() - today.getDay());
+        break;
+      case 'lastweek':
+        start.setDate(today.getDate() - today.getDay() - 7);
+        return {
+          startDate: start.toISOString().split('T')[0],
+          endDate: new Date(today.setDate(today.getDate() - today.getDay() - 1)).toISOString().split('T')[0]
+        };
+      case 'thismonth':
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        break;
+      case 'lastmonth':
+        start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        return {
+          startDate: start.toISOString().split('T')[0],
+          endDate: new Date(today.getFullYear(), today.getMonth(), 0).toISOString().split('T')[0]
+        };
+      default:
+        start.setDate(today.getDate() - 7);
+    }
+    
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end
+    };
+  };
   // Convert applied filters to API query parameters
   const getQueryParams = () => {
     switch (appliedFilters.type) {
       case 'range':
-        return { startDate: appliedFilters.startDate, endDate: appliedFilters.endDate };
+        return { date: `${appliedFilters.startDate}:${appliedFilters.endDate}` };
       case 'single':
         return { date: appliedFilters.startDate };
-      case 'relative':
-        return { relative: appliedFilters.relativePeriod };
+      case 'relative': {
+        const { startDate, endDate } = calculateRelativeDates(appliedFilters.relativePeriod);
+        return { date: `${startDate}:${endDate}` };
+      }
       default:
         return { date: 'all' };
     }
@@ -119,6 +165,7 @@ export default function AnalyticsPage() {
 
     // Update applied filters (this will trigger data fetch)
     setAppliedFilters({ ...selectedFilters });
+    console.log(appliedFilters)
 
     // Update URL params for deep linking
     const params = new URLSearchParams();
@@ -167,13 +214,6 @@ export default function AnalyticsPage() {
     if (!data) {
       return <div className="text-center p-4">No data available</div>;
     }
-
-    const transformPieData = (data: Record<string, number>) => {
-      return Object.entries(data).map(([name, value]) => ({
-        name,
-        value: typeof value === 'number' ? value : 0
-      }));
-    };
 
     const handleDownloadPDF = () => {
     // Hide the download button before printing
@@ -523,23 +563,19 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Pie Charts Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Types Distribution</h3>
-                </div>
-                <div className="p-6 flex-1">
-                  <PieChart data={transformPieData(data.type)} />
-                </div>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Operations Distribution</h3>
-                </div>
-                <div className="p-6 flex-1">
-                  <PieChart data={transformPieData(data.operation)} />
-                </div>
-              </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <DrillDownPieChart
+                data={data.crossTypeOp}
+                title="Transaction Types"
+                colorScheme="blue"
+              />
+              
+              <DrillDownPieChart
+                data={data.crossOpType}
+                title="Transaction Operations"
+                colorScheme='purple'
+              />
             </div>
           </div>
 
@@ -575,7 +611,7 @@ export default function AnalyticsPage() {
             <h3 className="text-lg font-semibold text-gray-900">Duplicate Tokens Analysis</h3>
           </div>
           <div className="p-6">
-            <DuplicateTokensTable data={data.duplicateTokens} />
+            <DuplicateTokensTable data={data.duplicateTokens} total={data.total}/>
           </div>
         </div>
 

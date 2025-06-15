@@ -136,13 +136,13 @@ export default function ErrorAnalysisCard({ errorData }: ErrorAnalysisProps) {
   return (
     <div className="flex-1">
       {/* Card Header with Toggle */}
-      <div className="px-6 py-4 border-b border-gray-200">
+      <div className="px-4 py-4 border-b border-gray-200">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h3 className="text-lg font-semibold text-gray-900">Error Analysis</h3>
+          <h3 className="text-md font-semibold text-gray-900">Error Analysis</h3>
           
           {/* Toggle Switch */}
           <div className="flex items-center gap-3">
-            <span className={`text-sm font-medium ${analysisType === 'operation' ? 'text-blue-600' : 'text-gray-500'}`}> 
+            <span className={`text-xs font-medium ${analysisType === 'operation' ? 'text-blue-600' : 'text-gray-500'}`}> 
               Operation vs Error
             </span>
             <button
@@ -157,7 +157,7 @@ export default function ErrorAnalysisCard({ errorData }: ErrorAnalysisProps) {
                 }`}
               />
             </button>
-            <span className={`text-sm font-medium ${analysisType === 'type' ? 'text-blue-600' : 'text-gray-500'}`}> 
+            <span className={`text-xs font-medium ${analysisType === 'type' ? 'text-blue-600' : 'text-gray-500'}`}> 
               Type vs Error
             </span>
           </div>
@@ -168,7 +168,7 @@ export default function ErrorAnalysisCard({ errorData }: ErrorAnalysisProps) {
         {/* <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"> */}
           {/* Cross Tabulation Chart */}
           <div className="lg:col-span-2">
-            <div className="h-80">
+            <div className="h-102">
               <EChartsReact 
                 option={getCrossTabChartOptions()} 
                 style={{ height: '100%', width: '100%' }}
@@ -177,7 +177,7 @@ export default function ErrorAnalysisCard({ errorData }: ErrorAnalysisProps) {
           </div>
 
           {/* Error Summary Panel */}
-          <div className="lg:col-span-1 mt-4">
+          <div className="lg:col-span-1 mt-5">
           <div className="bg-gray-50 rounded-lg p-4">
             <h4 className="text-md font-semibold text-gray-900 mb-4">Error Summary</h4>
 

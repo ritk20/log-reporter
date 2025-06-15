@@ -6,10 +6,6 @@ interface SearchResult {
   tokenId?: string;
   msgId?: string;
   serialNo?: string;
-  occurrenceCount?: number;
-  totalAmount?: number;
-  latestTransaction?: string;
-  organizations?: string[];
   amount?: string;
   currency?: string;
   timestamp?: string;
@@ -25,36 +21,6 @@ interface SearchResultsProps {
 }
 
 export function SearchResults({ results, searchType, loading }: SearchResultsProps) {
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-
-  const toggleRow = (id: string) => {
-    const newExpanded = new Set(expandedRows);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-    }
-    setExpandedRows(newExpanded);
-  };
-
-  const formatAmount = (amount: number | string) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2
-    }).format(num);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
   if (loading) {
     return (
@@ -82,152 +48,102 @@ export function SearchResults({ results, searchType, loading }: SearchResultsPro
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-      <div className="px-6 py-4 border-b bg-gray-50">
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="px-6 py-4 bg-gray-50">
         <h3 className="text-lg font-semibold text-gray-800">
           Search Results ({results.length})
         </h3>
       </div>
 
       <div className="divide-y divide-gray-200">
-        {results.map((result, index) => {
-          const resultId = result.id || `${result.tokenId}-${result.serialNo}-${index}`;
-          const isExpanded = expandedRows.has(resultId);
-
-          return (
-            <div key={resultId} className="hover:bg-gray-50 transition-colors">
-              <div 
-                className="px-6 py-4 cursor-pointer"
-                onClick={() => toggleRow(resultId)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    {searchType === 'token' ? (
-                      // Token Search Results
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded">
-                            TOKEN
-                          </span>
-                          <code className="text-sm font-mono text-gray-800 break-all">
-                            {result.tokenId}
-                          </code>
-                        </div>
-                        <div className="flex items-center space-x-6 text-sm text-gray-600">
-                          <span className="flex items-center">
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2h4a1 1 0 110 2h-1v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6H3a1 1 0 110-2h4z" />
-                            </svg>
-                            {result.occurrenceCount} transactions
-                          </span>
-                          <span className="flex items-center">
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                            </svg>
-                            {formatAmount(result.totalAmount || 0)}
-                          </span>
-                          {result.organizations && result.organizations.length > 0 && (
-                            <span className="flex items-center">
-                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                              </svg>
-                              {result.organizations.join(', ')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      // Serial Number Search Results
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded">
-                            SERIAL
-                          </span>
-                          <code className="text-sm font-mono text-gray-800">
-                            {result.serialNo}
-                          </code>
-                        </div>
-                        <div className="flex items-center space-x-6 text-sm text-gray-600">
-                          <span className="flex items-center">
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                            </svg>
-                            {formatAmount(`${result.amount} ${result.currency}`)}
-                          </span>
-                          <span className="flex items-center">
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            {result.timestamp && formatDate(result.timestamp)}
-                          </span>
-                          <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
-                            {result.transactionId}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="ml-4 flex-shrink-0">
-                    <svg 
-                      className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
-
-                {/* Expanded Details */}
-                {isExpanded && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      {searchType === 'token' ? (
-                        <>
-                          <div>
-                            <span className="font-medium text-gray-700">Token ID:</span>
-                            <code className="block mt-1 p-2 bg-gray-100 rounded text-xs break-all">
-                              {result.tokenId}
-                            </code>
-                          </div>
-                          <div>
-                            <span className="font-medium text-gray-700">Latest Transaction:</span>
-                            <p className="mt-1 text-gray-600">
-                              {result.latestTransaction && formatDate(result.latestTransaction)}
-                            </p>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div>
-                            <span className="font-medium text-gray-700">Associated Token:</span>
-                            <code className="block mt-1 p-2 bg-gray-100 rounded text-xs break-all">
-                              {result.tokenId}
-                            </code>
-                          </div>
-                          <div>
-                            <span className="font-medium text-gray-700">Organizations:</span>
-                            <p className="mt-1 text-gray-600">
-                              {result.senderOrg} → {result.receiverOrg}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="font-medium text-gray-700">Message ID:</span>
-                            <code className="block mt-1 p-2 bg-gray-100 rounded text-xs">
-                              {result.msgId}
-                            </code>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+{results.map((result, index) => (
+  <div key={index} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-6 mb-4">
+    {/* Header with Token ID and Serial Number */}
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 pb-4 border-b border-gray-100">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2 sm:mb-0">
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          Token: {result.tokenId}
+        </span>
+        {result.serialNo && (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            Serial: {result.serialNo}
+          </span>
+        )}
+      </div>
+    </div>
+    
+    {/* Main Content Grid */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Amount Section */}
+      {result.amount && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-gray-500 uppercase tracking-wide">Amount</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {parseFloat(result.amount).toLocaleString()} 
+            <span className="text-sm font-normal text-gray-500 ml-1">{result.currency}</span>
+          </div>
+        </div>
+      )}
+      
+      {/* Organizations Section */}
+      {(result.senderOrg || result.receiverOrg) && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-gray-500 uppercase tracking-wide">Organizations</div>
+          <div className="flex items-center text-sm text-gray-700">
+            {result.senderOrg && (
+              <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs font-medium">
+                {result.senderOrg}
+              </span>
+            )}
+            {result.senderOrg && result.receiverOrg && (
+              <svg className="mx-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            )}
+            {result.receiverOrg && (
+              <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-medium">
+                {result.receiverOrg}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Transaction Details Section */}
+      <div className="space-y-2">
+        <div className="text-sm font-medium text-gray-500 uppercase tracking-wide">Transaction Details</div>
+        <div className="space-y-1">
+          {result.transactionId && (
+            <div className="text-xs text-gray-600 font-mono bg-gray-50 px-2 py-1 rounded">
+              TX: {result.transactionId}
             </div>
-          );
-        })}
+          )}
+          {result.msgId && (
+            <div className="text-xs text-gray-600 font-mono bg-gray-50 px-2 py-1 rounded">
+              MSG: {result.msgId}
+            </div>
+          )}
+          {result.timestamp && (
+            <div className="text-xs text-gray-500 flex items-center">
+              <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {new Date(result.timestamp).toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+    
+  </div>
+))}
+
       </div>
     </div>
   );

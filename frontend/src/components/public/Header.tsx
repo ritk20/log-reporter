@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useTask } from '../../hooks/useTask';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -9,13 +9,29 @@ export function Header() {
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [latestDate, setLatestDate] = useState(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  // Fetch latest date when task completes
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
+
   useEffect(() => {
     if (task.status === "completed") {
       const fetchLatestDate = async () => {
@@ -81,10 +97,9 @@ export function Header() {
         <Link to="/" className="text-xl font-bold text-gray-800">
           ABAS Analytics
         </Link>
-        
+
         <div className="flex items-center space-x-4">
-          {/* Notification Bell */}
-          <div className="relative">
+          <div className="relative" ref={notificationRef}>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="relative p-2 text-gray-600 hover:text-gray-800 focus:outline-none"
@@ -97,15 +112,12 @@ export function Header() {
               )}
             </button>
 
-            {/* Notification Dropdown */}
             {showNotifications && (
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border z-50">
                 <div className="p-4 border-b">
                   <h3 className="font-semibold text-gray-800">Notifications</h3>
                 </div>
-                
                 <div className="max-h-96 overflow-y-auto">
-                  {/* Current Active Task */}
                   {hasActiveTask && (
                     <div className="p-4 border-b bg-blue-50">
                       <div className="flex items-center justify-between">
@@ -128,7 +140,7 @@ export function Header() {
                       {task.progress && task.status !== 'completed' && (
                         <div className="mt-2">
                           <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
+                            <div
                               className="bg-blue-600 h-2 rounded-full transition-all"
                               style={{ width: `${(task.progress.current / task.progress.total) * 100}%` }}
                             ></div>
@@ -138,7 +150,6 @@ export function Header() {
                     </div>
                   )}
 
-                  {/* Task History */}
                   {taskHistory.length > 0 && (
                     <div className="p-2">
                       <p className="text-xs font-medium text-gray-500 px-2 mb-2">Recent Tasks</p>
@@ -188,33 +199,17 @@ export function Header() {
             )}
           </div>
 
-          <nav className="flex space-x-4">
-            <Link to="/analytics" className="hover:underline">
-              Analytics
-            </Link>
-            <Link to="/search" className='hover:underline'>
-              Search
-            </Link>
+          <nav className="flex space-x-4 text-gray-700 font-medium">
+            <Link to="/analytics" className="hover:text-blue-600 transition-colors">Analytics</Link>
+            <Link to="/search" className="hover:text-blue-600 transition-colors">Search</Link>
             {user.role === 'admin' && (
               <>
-                <Link to="/admin/upload" className="hover:underline">
-                  Upload Logs
-                </Link>
-                <Link to="/admin/dashboard" className="hover:underline">
-                  Admin Dashboard
-                </Link>
+                <Link to="/admin/upload" className="hover:text-blue-600 transition-colors">Upload Logs</Link>
+                <Link to="/admin/dashboard" className="hover:text-blue-600 transition-colors">Admin Dashboard</Link>
               </>
             )}
-            <button onClick={handleLogout} className="hover:underline">
-              Logout
-            </button>
+            <button onClick={handleLogout} className="hover:text-red-600 transition-colors">Logout</button>
           </nav>
-          {/* <button
-            onClick={handleLogout}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Logout
-          </button> */}
         </div>
       </div>
     </header>

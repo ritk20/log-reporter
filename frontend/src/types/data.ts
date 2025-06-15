@@ -93,7 +93,8 @@ export type TxSummary = {
   type: Record<Tx['type'],number> // all transaction type (redundant)
   error: Record<Tx['error'], number>  //all error divisions (redundant)
 
-  crossTypeOp: Record<Tx['type'], Record<Tx['operation'], number>>  //redundant
+  crossTypeOp: Record<Tx['type'], Record<Tx['operation'], number>>
+  crossOpType: Record<Tx['operation'], Record<Tx['type'], number>>
   crossTypeError: Record<Tx['type'], Record<Tx['error'], number>> //redundant
   crossOpError: Record<Tx['operation'], Record<Tx['error'], number>>  //redundant
   amountDistribution: Array<{ x: number; y: number; type?: Tx['type'] }>
