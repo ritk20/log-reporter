@@ -1,65 +1,207 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import '../../components/charts/echartsSetup.ts'
-import PieChart from '../../components/charts/Pie.tsx';
-import CrosstabChart from '../../components/charts/Crosstab.tsx';
 import ScatterChart from '../../components/charts/Scatter.tsx';
 import Histogram from '../../components/charts/Histogram.tsx';
-import DuplicateTokensTable from '../../components/public/DuplicateTokens.tsx';
+import DuplicateTokensTable from '../../components/cards/DuplicateTokens.tsx';
 // import TokenFlowGraph from '../../components/graphs/FlowGraph.tsx';
 
 //TODO: Replace with real data fetching logic
-// import TemporalDashboard from '../../components/charts/TimeSeries.tsx';
 import './print-analytics.css';
-// import KPIcards from '../../components/public/KPIcards.tsx';
 
 import { useAnalytics } from '../../hooks/useAnalytics.tsx';
 import { LoadingSpinner } from '../../components/public/Loading.tsx';
-import KPICard from '../../components/public/KPIcards.tsx';
 import TemporalDashboard from '../../components/charts/TimeSeries.tsx';
-// import { TransactionType, OperationType, ErrorCode } from '../../types/enums.ts';
+import ErrorAnalysisCard from '../../components/cards/ErrorAnalysis.tsx';
+import KPICard from '../../components/public/KPIcards.tsx';
+import DrillDownPieChart from '../../components/charts/Pie.tsx';
 
 //TODO: add timeValue and timeUnit to the API call
 export default function AnalyticsPage() {
-    const ops = ['SPLIT', 'MERGE', 'ISSUE'];
-    const errors = ['No error', 'AS401', 'AS402', 'AS403', 'AS404', 'AS405'];
-
     //TODO: Add aggregation in backend for fetching timeseries data by a custom range 
     // const [timeValue, setTimeValue] = useState<number>(24); 
     // const [timeUnit, setTimeUnit] = useState<string>('hours');
 
-    //for now, we use datepicker for one day/all-time summary
-    // datePicker: "" means no date selected → treat as All Time in our logic
-
     const [searchParams, setSearchParams] = useSearchParams();
-    const navigate = useNavigate();
-    const date = searchParams.get('date');
 
-    // Remove these state variables since we'll use URL params instead
-    // const [selectedDate, setSelectedDate] = useState<string>('');
-    // const [allTime, setAllTime] = useState<boolean>(true);
+  // Date range state management
+  const [appliedFilters, setAppliedFilters] = useState({
+    type: 'all' as 'all' | 'single' | 'range' | 'relative',
+    startDate: '',
+    endDate: '',
+    relativePeriod: 'last7days'
+  });
 
-    const dateParam = searchParams.get("date") ?? "all";
-    const [isAllTime, setIsAllTime] = useState(dateParam === "all");
-    const [selectedDate, setSelectedDate] = useState(
-      dateParam === "all" ? '' : dateParam
-    );
+  // UI selection state (doesn't trigger data fetch)
+  const [selectedFilters, setSelectedFilters] = useState({
+    type: 'all' as 'all' | 'single' | 'range' | 'relative',
+    startDate: '',
+    endDate: '',
+    relativePeriod: 'last7days'
+  });
 
-    useEffect(() => {
-      const currentDate = searchParams.get("date") ?? "all";
-      setIsAllTime(currentDate === "all");
-      if (currentDate !== "all") {
-        setSelectedDate(currentDate);
+  // Initialize from URL params on component mount
+  useEffect(() => {
+    const dateParam = searchParams.get('date') || 'all';
+    const startParam = searchParams.get('startDate');
+    const endParam = searchParams.get('endDate');
+    const relativeParam = searchParams.get('relative');
+
+    let initialFilters;
+    if (startParam && endParam) {
+      initialFilters = {
+        type: 'range' as const,
+        startDate: startParam,
+        endDate: endParam,
+        relativePeriod: 'last7days'
+      };
+    } else if (relativeParam) {
+      initialFilters = {
+        type: 'relative' as const,
+        startDate: '',
+        endDate: '',
+        relativePeriod: relativeParam
+      };
+    } else if (dateParam !== 'all') {
+      initialFilters = {
+        type: 'single' as const,
+        startDate: dateParam,
+        endDate: '',
+        relativePeriod: 'last7days'
+      };
+    } else {
+      initialFilters = {
+        type: 'all' as const,
+        startDate: '',
+        endDate: '',
+        relativePeriod: 'last7days'
+      };
+    }
+
+    setAppliedFilters(initialFilters);
+    setSelectedFilters(initialFilters);
+  }, [searchParams]); // Only run on mount
+
+  const calculateRelativeDates = (period: string): { startDate: string; endDate: string } => {
+    const today = new Date();
+    const end = today.toISOString().split('T')[0];
+    let start = new Date();
+
+    switch (period) {
+      case 'last24hours':
+        start.setDate(today.getDate() - 1);
+        break;
+      case 'last7days':
+        start.setDate(today.getDate() - 7);
+        break;
+      case 'last30days':
+        start.setDate(today.getDate() - 30);
+        break;
+      case 'last90days':
+        start.setDate(today.getDate() - 90);
+        break;
+      case 'thisweek':
+        start.setDate(today.getDate() - today.getDay());
+        break;
+      case 'lastweek':
+        start.setDate(today.getDate() - today.getDay() - 7);
+        return {
+          startDate: start.toISOString().split('T')[0],
+          endDate: new Date(today.setDate(today.getDate() - today.getDay() - 1)).toISOString().split('T')[0]
+        };
+      case 'thismonth':
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        break;
+      case 'lastmonth':
+        start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        return {
+          startDate: start.toISOString().split('T')[0],
+          endDate: new Date(today.getFullYear(), today.getMonth(), 0).toISOString().split('T')[0]
+        };
+      default:
+        start.setDate(today.getDate() - 7);
+    }
+    
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end
+    };
+  };
+  // Convert applied filters to API query parameters
+  const getQueryParams = () => {
+    switch (appliedFilters.type) {
+      case 'range':
+        return { date: `${appliedFilters.startDate}:${appliedFilters.endDate}` };
+      case 'single':
+        return { date: appliedFilters.startDate };
+      case 'relative': {
+        const { startDate, endDate } = calculateRelativeDates(appliedFilters.relativePeriod);
+        return { date: `${startDate}:${endDate}` };
       }
-    }, [searchParams]);
+      default:
+        return { date: 'all' };
+    }
+  };
 
-    useEffect(() => {
-      if (!date) {
-        navigate('/analytics?date=all', { replace: true });
-      }
-    }, [date, navigate]);
+  // This will only change when appliedFilters changes (i.e., when Apply is clicked)
+  const queryParams = useMemo(() => getQueryParams(), [appliedFilters]);
+  const { data, isLoading, error } = useAnalytics(queryParams);
 
-    const { data, isLoading, error } = useAnalytics(date || 'all');
+  // Apply filters and trigger data fetch
+  const applyFilters = () => {
+    // Validation
+    if (selectedFilters.type === 'single' && !selectedFilters.startDate) {
+      alert('Please select a date');
+      return;
+    }
+    if (selectedFilters.type === 'range' && (!selectedFilters.startDate || !selectedFilters.endDate)) {
+      alert('Please select both start and end dates');
+      return;
+    }
+    if (selectedFilters.type === 'range' && selectedFilters.startDate > selectedFilters.endDate) {
+      alert('Start date must be before end date');
+      return;
+    }
+
+    // Update applied filters (this will trigger data fetch)
+    setAppliedFilters({ ...selectedFilters });
+    console.log(appliedFilters)
+
+    // Update URL params for deep linking
+    const params = new URLSearchParams();
+    switch (selectedFilters.type) {
+      case 'range':
+        if (selectedFilters.startDate && selectedFilters.endDate) {
+          params.set('startDate', selectedFilters.startDate);
+          params.set('endDate', selectedFilters.endDate);
+        }
+        break;
+      case 'single':
+        if (selectedFilters.startDate) {
+          params.set('date', selectedFilters.startDate);
+        }
+        break;
+      case 'relative':
+        params.set('relative', selectedFilters.relativePeriod);
+        break;
+      default:
+        params.set('date', 'all');
+    }
+    setSearchParams(params);
+  };
+
+  // Reset filters
+  const resetFilters = () => {
+    const defaultFilters = {
+      type: 'all' as const,
+      startDate: '',
+      endDate: '',
+      relativePeriod: 'last7days'
+    };
+    setSelectedFilters(defaultFilters);
+    setAppliedFilters(defaultFilters);
+    setSearchParams({ date: 'all' });
+  };
 
     if (isLoading) {
       return <LoadingSpinner/>
@@ -72,13 +214,6 @@ export default function AnalyticsPage() {
     if (!data) {
       return <div className="text-center p-4">No data available</div>;
     }
-
-    const transformPieData = (data: Record<string, number>) => {
-      return Object.entries(data).map(([name, value]) => ({
-        name,
-        value: typeof value === 'number' ? value : 0
-      }));
-    };
 
     const handleDownloadPDF = () => {
     // Hide the download button before printing
@@ -97,143 +232,402 @@ export default function AnalyticsPage() {
       }
     }, 1000);
   };
-
   return (
-    <div className="analytics-container" id="analytics-content">
-      <div className="flex-1 flex justify-center">
-        <div id="analytics-header" className="flex flex-col items-center">
-          <h1 className='text-2xl font-bold'>Transaction Analytics Dashboard</h1>
-            {/* Date selector + All Time */}
-            <div className="flex gap-4 items-center mt-2">
-            <h1 className='font-semibold'>Report Period: </h1>
-            <label className="flex items-center space-x-2">
-              <input
-              type="checkbox"
-              checked={isAllTime}
-              onChange={(e) => {
-                const newVal = e.target.checked;
-                setIsAllTime(newVal);
-                if (newVal) {
-                setSearchParams({ date: "all" });
-                }
-              }}
-              />
-              <span className="text-gray-700">All-Time</span>
-            </label>
-            <h2 className='font-semibold'>OR</h2>
-            <label className="flex items-center space-x-2">
-              <span className="text-gray-700">Select Date:</span>
-              <input
-              type="date"
-              disabled={isAllTime}
-              value={selectedDate}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSelectedDate(val);
-              }}
-              />
-            </label>
-            <button
-              className="ml-2 px-3 py-1 bg-blue-500 text-white rounded disabled:opacity-50"
-              disabled={isAllTime || !selectedDate}
-              onClick={() => {
-              if (selectedDate) {
-                setSearchParams({ date: selectedDate });
-              }
-              }}
+    <div className="min-h-screen bg-gray-50 p-6">
+      {/* Dashboard Header */}
+      <div className="mb-8">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4 lg:mb-0">
+            Transaction Analytics Dashboard
+          </h1>
+          <div className="flex gap-3">
+            <button 
+              id="download-pdf-btn"
+              onClick={handleDownloadPDF}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
-              Search
+              Download PDF
+            </button>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-all duration-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Date Filter</h3>
+          
+          {/* Date Range Type Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+              selectedFilters.type === 'all' 
+                ? 'border-blue-500 bg-blue-50' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}>
+              <input
+                type="radio"
+                value="all"
+                checked={selectedFilters.type === 'all'}
+                onChange={(e) => setSelectedFilters(prev => ({
+                  ...prev, 
+                  type: e.target.value as 'all' | 'single' | 'range' | 'relative'
+                }))}
+                className="w-4 h-4 text-blue-600 mr-3"
+              />
+              <div>
+                <div className="font-medium text-gray-900">All Time</div>
+                <div className="text-sm text-gray-500">All available data</div>
+              </div>
+            </label>
+
+            <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+              selectedFilters.type === 'single' 
+                ? 'border-blue-500 bg-blue-50' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}>
+              <input
+                type="radio"
+                value="single"
+                checked={selectedFilters.type === 'single'}
+                onChange={(e) => setSelectedFilters(prev => ({
+                  ...prev, 
+                  type: e.target.value as 'all' | 'single' | 'range' | 'relative'
+                }))}
+                className="w-4 h-4 text-blue-600 mr-3"
+              />
+              <div>
+                <div className="font-medium text-gray-900">Single Date</div>
+                <div className="text-sm text-gray-500">Specific day</div>
+              </div>
+            </label>
+
+            <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+              selectedFilters.type === 'range' 
+                ? 'border-blue-500 bg-blue-50' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}>
+              <input
+                type="radio"
+                value="range"
+                checked={selectedFilters.type === 'range'}
+                onChange={(e) => setSelectedFilters(prev => ({
+                  ...prev, 
+                  type: e.target.value as 'all' | 'single' | 'range' | 'relative'
+                }))}
+                className="w-4 h-4 text-blue-600 mr-3"
+              />
+              <div>
+                <div className="font-medium text-gray-900">Date Range</div>
+                <div className="text-sm text-gray-500">Custom range</div>
+              </div>
+            </label>
+
+            <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+              selectedFilters.type === 'relative' 
+                ? 'border-blue-500 bg-blue-50' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}>
+              <input
+                type="radio"
+                value="relative"
+                checked={selectedFilters.type === 'relative'}
+                onChange={(e) => setSelectedFilters(prev => ({
+                  ...prev, 
+                  type: e.target.value as 'all' | 'single' | 'range' | 'relative'
+                }))}
+                className="w-4 h-4 text-blue-600 mr-3"
+              />
+              <div>
+                <div className="font-medium text-gray-900">Relative</div>
+                <div className="text-sm text-gray-500">Last N days/weeks</div>
+              </div>
+            </label>
+          </div>
+
+          {/* Date Input Controls */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {/* Single Date */}
+            {selectedFilters.type === 'single' && (
+              <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Date
+                </label>
+                <input
+                  type="date"
+                  value={selectedFilters.startDate}
+                  onChange={(e) => setSelectedFilters(prev => ({
+                    ...prev,
+                    startDate: e.target.value
+                  }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
+
+            {/* Date Range */}
+            {selectedFilters.type === 'range' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={selectedFilters.startDate}
+                    onChange={(e) => setSelectedFilters(prev => ({
+                      ...prev,
+                      startDate: e.target.value
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={selectedFilters.endDate}
+                    onChange={(e) => setSelectedFilters(prev => ({
+                      ...prev,
+                      endDate: e.target.value
+                    }))}
+                    min={selectedFilters.startDate}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Relative Period */}
+            {selectedFilters.type === 'relative' && (
+              <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Time Period
+                </label>
+                <select
+                  value={selectedFilters.relativePeriod}
+                  onChange={(e) => setSelectedFilters(prev => ({
+                    ...prev,
+                    relativePeriod: e.target.value
+                  }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="last24hours">Last 24 Hours</option>
+                  <option value="last7days">Last 7 Days</option>
+                  <option value="last30days">Last 30 Days</option>
+                  <option value="last90days">Last 90 Days</option>
+                  <option value="thisweek">This Week</option>
+                  <option value="lastweek">Last Week</option>
+                  <option value="thismonth">This Month</option>
+                  <option value="lastmonth">Last Month</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 items-center">
+            <button
+              onClick={applyFilters}
+              className={`px-6 py-2 rounded-lg font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700`}
+            >
+              Apply Filters
+            </button>
+            <button
+              onClick={resetFilters}
+              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Reset
             </button>
           </div>
 
-          <button 
-            id="download-pdf-btn"
-            className='px-4 mb-3 underline text-blue-500 cursor-pointer no-print'
-            onClick={handleDownloadPDF}
-          >
-            Download as PDF
-          </button>
-          </div>
-      </div>
-
-      <p className='flex justify-center'>Total Transactions = {data.total}</p>
-      <p className='flex justify-center mb-4'>Success Rate = {data.successRate}%</p>
-
-      <div className='grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 charts-container'>
-        <PieChart title="Transaction Types" data={transformPieData(data.type)} />
-        <PieChart title="Transaction Operations" data={transformPieData(data.operation)} />
-        <PieChart title="Transaction Errors" data={transformPieData(data.error)} />
-      </div>
-
-      <div className='mt-8 chart-container charts-section'>=
-        <CrosstabChart title="Type vs Operation" data={data.crossTypeOp ?? {}} name={ops}/>
-      </div>
-      <div className='mt-8 chart-container'>
-        <CrosstabChart title="Type vs Error" data={data.crossTypeError ?? {}} name={errors} />
-      </div>
-      <div className='mt-8 chart-container'>
-        <CrosstabChart title="Operation vs Error" data={data.crossOpError ?? {}} name={errors} />
-      </div>
-
-      {/* <div className='mt-8 chart-container'>
-        <ScatterChart title="Amount vs Transaction Index" xAxis="Transaction Index" yAxis="Amount"
-          data = {data.amountDistribution} />
-      </div> */}
-
-      {/* TODO:Uncomment when we make the amount distribution histogram data */}
-      <div className='m-8'>
-        <Histogram
-          title="Transaction Amount Distribution"
-          data={data.mergedTransactionAmountIntervals}
-          stacked={true}
-        />
-      </div>
-
-      <div className='mt-8 chart-container charts-section'>
-        <div className='grid gap-6 grid-cols-1 lg:grid-cols-2'>
-          <div>
-            <ScatterChart 
-              title="Processing Time vs Input Tokens"
-              xAxis="No. of Input Tokens"
-              yAxis="Processing Time (ms)"
-              data={data.processingTimeByInputs}
-            />
-          </div>
-          <div>
-            <ScatterChart 
-              title="Processing Time vs Output Tokens"
-              xAxis="No. of Output Tokens"
-              yAxis="Processing Time (ms)"
-              data={data.processingTimeByOutputs}
-            />
+          {/* Current Applied Filter Display */}
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="text-sm">
+              <span className="font-medium text-blue-900">Active Filter: </span>
+              <span className="text-blue-700">
+                {appliedFilters.type === 'all' && 'All Time'}
+                {appliedFilters.type === 'single' && appliedFilters.startDate && `Single Date: ${appliedFilters.startDate}`}
+                {appliedFilters.type === 'range' && appliedFilters.startDate && appliedFilters.endDate && `Range: ${appliedFilters.startDate} to ${appliedFilters.endDate}`}
+                {appliedFilters.type === 'relative' && `${appliedFilters.relativePeriod.replace(/([A-Z])/g, ' $1').toLowerCase()}`}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className='flex justify-around'>
-        <KPICard title="Processing Time Summary" mean={data.averageProcessingTime} stdev={data.stdevProcessingTime} min={data.minProcessingTime} max={data.maxProcessingTime} percentile25={data.percentile25ProcessingTime} percentile50={data.percentile50ProcessingTime} percentile75={data.percentile75ProcessingTime}/>
-        <KPICard title="Transaction Amount Summary" mean={data.averageTransactionAmount} stdev={data.stdevTransactionAmount} min={data.minTransactionAmount} max={data.maxTransactionAmount} percentile25={data.percentile25TransactionAmount} percentile50={data.percentile50TransactionAmount} percentile75={data.percentile75TransactionAmount}/>
-      </div> 
+      {/* Main Dashboard Content */}
+      <div className="space-y-8">
+        {/* KPI Cards Section */}
+        <div className="space-y-6">
+          {/* Primary KPIs Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="col-span-1 md:col-span-2">
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total Transactions</p>
+                    <p className="text-3xl font-bold text-gray-900">{data.total}</p>
+                    {/* needs to be changed */}
+                    <p className="text-sm text-gray-500 mt-1">All time transactions</p> 
+                  </div>
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="col-span-1 md:col-span-2">
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Success Rate</p>
+                    <p className="text-3xl font-bold text-green-600">{data.successRate}%</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {data.successRate >= 95 ? 'Excellent' : data.successRate >= 90 ? 'Good' : 'Needs attention'}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-      <div className="mt-8" id='analytics-table'>
-        <DuplicateTokensTable data={data.duplicateTokens}/>
+          {/* Statistical KPI Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <KPICard
+              title="Transaction Amounts"
+              mean={data.averageTransactionAmount}
+              stdev={data.stdevTransactionAmount}
+              min={data.minTransactionAmount}
+              max={data.maxTransactionAmount}
+              percentile25={data.percentile25TransactionAmount}
+              percentile50={data.percentile50TransactionAmount}
+              percentile75={data.percentile75TransactionAmount}
+              unit=" Rs" //hardcoded to Rs
+              colorScheme="blue"
+            />
+            
+            <KPICard
+              title="Processing Time"
+              mean={data.averageProcessingTime}
+              stdev={data.stdevProcessingTime}
+              min={data.minProcessingTime}
+              max={data.maxProcessingTime}
+              percentile25={data.percentile25ProcessingTime}
+              percentile50={data.percentile50ProcessingTime}
+              percentile75={data.percentile75ProcessingTime}
+              unit="s"
+              colorScheme="green"
+            />
+            
+            <KPICard
+              title="Error Rate"
+              mean={data.averageProcessingTime}
+              stdev={data.stdevProcessingTime}
+              min={data.minProcessingTime}
+              max={data.maxProcessingTime}
+              percentile25={data.percentile25ProcessingTime}
+              percentile50={data.percentile50ProcessingTime}
+              percentile75={data.percentile75ProcessingTime}
+              unit="%"
+              colorScheme="red"
+            />
+          </div>
+        </div>
+
+
+        {/* Charts Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+          {/* Left Column */}
+          <div className="xl:col-span-2 space-y-6 flex flex-col h-full">
+            {/* Histogram */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Transaction Amount Distribution</h3>
+              </div>
+              <div className="p-6 flex-1">
+                <div className="h-96">
+                  <Histogram 
+                    title="Transaction Amount Distribution"
+                    data={data.mergedTransactionAmountIntervals}
+                    stacked={true}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Pie Charts Row */}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <DrillDownPieChart
+                data={data.crossTypeOp}
+                title="Transaction Types"
+                colorScheme="blue"
+              />
+              
+              <DrillDownPieChart
+                data={data.crossOpType}
+                title="Transaction Operations"
+                colorScheme='purple'
+              />
+            </div>
+          </div>
+
+          {/* Right Column: Error Analysis */}
+          <div className="xl:col-span-1 space-y-6 flex flex-col h-full">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm h-full flex flex-col hover:shadow-md transition-all duration-200">
+              <ErrorAnalysisCard 
+                errorData={{
+                  error: data.error,
+                  crossTypeError: data.crossTypeError ?? {},
+                  crossOpError: data.crossOpError
+                }} 
+              />
+            </div>
+          </div>
+        </div>
+
+
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Performance Scatter</h3>
+          </div>
+          <div className="p-6">
+            <div className="h-64">
+              <ScatterChart title='Processing Time vs Input Tokens' data={data.processingTimeByInputs} />
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Section - Data Tables */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Duplicate Tokens Analysis</h3>
+          </div>
+          <div className="p-6">
+            <DuplicateTokensTable data={data.duplicateTokens} total={data.total}/>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <TemporalDashboard
+              aggregatedData={data.temporal ?? data.transactionStatsByhourInterval.map(e => ({
+                ...e,
+                byType: e.byType || {},
+                byOp: e.byOp || {},
+                byErr: e.byErr || {}
+              }))}
+              isHourlyData={!data.temporal}
+            />
+        </div>
+
       </div>
-      
-      <div className='mt-8 chart-container'>
-        <h2 className='text-xl font-semibold mb-4'>Temporal Dashboard</h2>
-        <TemporalDashboard 
-          aggregatedData={data.temporal ?? data.transactionStatsByhourInterval.map(e => ({
-            ...e,
-            byType: e.byType || {},
-            byOp: e.byOp || {},
-            byErr: e.byErr || {}
-          }))}
-          isHourlyData={!data.temporal}
-        />
-      </div>
-      {/* <div className='mt-8'>
-        <TokenFlowGraph/>
-      </div> */}
     </div>
   );
 }

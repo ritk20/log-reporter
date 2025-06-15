@@ -6,7 +6,7 @@ export type Tx = {
   type: TransactionType
   operation: OperationType
   error: ErrorCode
-  error_message?: string // optional, only present if error is not 'No error'
+  error_message?: string // optional, only present if error is not 'Success'
   result: TransactionResult
   SenderOrgID: string
   ReceiverOrgID: string
@@ -44,7 +44,7 @@ export interface TransactionStats {
 
 export interface DuplicateToken {
   tokenId: string;
-  count?: number;
+  count: number;
   firstSeen?: string;
   lastSeen?: string;
   totalAmount?: number;
@@ -93,9 +93,10 @@ export type TxSummary = {
   type: Record<Tx['type'],number> // all transaction type (redundant)
   error: Record<Tx['error'], number>  //all error divisions (redundant)
 
-  crossTypeOp?: Record<Tx['type'], Record<Tx['operation'], number>>  //redundant
-  crossTypeError?: Record<Tx['type'], Record<Tx['error'], number>> //redundant
-  crossOpError?: Record<Tx['operation'], Record<Tx['error'], number>>  //redundant
+  crossTypeOp: Record<Tx['type'], Record<Tx['operation'], number>>
+  crossOpType: Record<Tx['operation'], Record<Tx['type'], number>>
+  crossTypeError: Record<Tx['type'], Record<Tx['error'], number>> //redundant
+  crossOpError: Record<Tx['operation'], Record<Tx['error'], number>>  //redundant
   amountDistribution: Array<{ x: number; y: number; type?: Tx['type'] }>
   mergedTransactionAmountIntervals: AmountInterval[]
   processingTimeByInputs: Array<{ x: number; y: number }>

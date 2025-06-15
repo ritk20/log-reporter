@@ -154,8 +154,9 @@ class LogStorageService:
                             tokenIds.append(token_id)
                         
                         token_occurrence = {
-                        "amount": input_token.get("value"),
-                        "currency": input_token.get("currency", "unknown"),
+                        "amount": input_token.get("value", "NA"),
+                        "currency": input_token.get("currency", "NA"),
+                        "serialNo": input_token.get("serialNo", "NA"),
                         "timestamp": log_entry['Request_timestamp'],
                         "senderOrg": log_entry.get('SenderOrgId'),
                         "receiverOrg": log_entry.get('ReceiverOrgId'),

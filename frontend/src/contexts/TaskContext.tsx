@@ -26,10 +26,21 @@ type TaskStatus =
   | "completed"
   | "failed";
 
+
 interface TaskContextValue {
   task: TaskInfo;
   setTask: (t: TaskInfo) => void;
   clearTask: () => void;
+  taskHistory: TaskInfo[]; // Add task history
 }
 
 export const TaskContext = createContext<TaskContextValue | undefined>(undefined);
+
+export interface TaskInfo {
+  taskId: string | null;
+  status: TaskStatus;
+  error: string | null;
+  progress: TaskProgress | null;
+  completedAt?: string; // Add completion timestamp
+}
+
