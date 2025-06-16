@@ -510,18 +510,29 @@ export default function AnalyticsPage() {
           {/* Statistical KPI Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <KPICard
-              title="Transaction Amounts"
-              mean={data.averageTransactionAmount}
-              stdev={data.stdevTransactionAmount}
-              min={data.minTransactionAmount}
-              max={data.maxTransactionAmount}
-              percentile25={data.percentile25TransactionAmount}
-              percentile50={data.percentile50TransactionAmount}
-              percentile75={data.percentile75TransactionAmount}
+              title="OFFUS Transaction Amount"
+              mean={data.averageOFFUSTransactionAmount}
+              stdev={data.stdevOFFUSTransactionAmount}
+              min={data.minOFFUSTransactionAmount}
+              max={data.maxOFFUSTransactionAmount}
+              percentile25={data.percentile25OFFUSTransactionAmount}
+              percentile50={data.percentile50OFFUSTransactionAmount}
+              percentile75={data.percentile75OFFUSTransactionAmount}
               unit=" Rs" //hardcoded to Rs
               colorScheme="blue"
             />
-            
+            <KPICard
+              title="ONUS Transaction Amount"
+              mean={data.averageONUSTransactionAmount}
+              stdev={data.stdevONUSTransactionAmount}
+              min={data.minONUSTransactionAmount}
+              max={data.maxONUSTransactionAmount}
+              percentile25={data.percentile25ONUSTransactionAmount}
+              percentile50={data.percentile50ONUSTransactionAmount}
+              percentile75={data.percentile75ONUSTransactionAmount}
+              unit=" Rs" //hardcoded to Rs
+              colorScheme="purple"
+            />
             <KPICard
               title="Processing Time"
               mean={data.averageProcessingTime}
@@ -533,19 +544,6 @@ export default function AnalyticsPage() {
               percentile75={data.percentile75ProcessingTime}
               unit="s"
               colorScheme="green"
-            />
-            
-            <KPICard
-              title="Error Rate"
-              mean={data.averageProcessingTime}
-              stdev={data.stdevProcessingTime}
-              min={data.minProcessingTime}
-              max={data.maxProcessingTime}
-              percentile25={data.percentile25ProcessingTime}
-              percentile50={data.percentile50ProcessingTime}
-              percentile75={data.percentile75ProcessingTime}
-              unit="%"
-              colorScheme="red"
             />
           </div>
         </div>
