@@ -28,7 +28,6 @@ export default function DrillDownPieChart({
   const [currentLevel, setCurrentLevel] = useState<'parent' | 'child'>('parent');
   const [selectedParent, setSelectedParent] = useState<string>('');
   const [breadcrumb, setBreadcrumb] = useState<string[]>([title]);
-  const [isAnimating, setIsAnimating] = useState(false);
 
   const colors = colorSchemes[colorScheme];
 
@@ -72,8 +71,7 @@ export default function DrillDownPieChart({
   }
 
   const handleDrillDown = (params: PieChartClickEvent) => {
-    if (currentLevel === 'parent' && !isAnimating) {
-      setIsAnimating(true);
+    if (currentLevel === 'parent') {
       const parentName = params.name;
       
       // Trigger animation sequence
@@ -81,30 +79,15 @@ export default function DrillDownPieChart({
         setSelectedParent(parentName);
         setCurrentLevel('child');
         setBreadcrumb([title, parentName]);
-        
-        // Reset animation state after transition
-        setTimeout(() => {
-          setIsAnimating(false);
-        }, 800);
       }, 100);
     }
   };
 
   // Handle drill-up (back to parent)
   const handleDrillUp = () => {
-    if (!isAnimating) {
-      setIsAnimating(true);
-      
-      setTimeout(() => {
         setCurrentLevel('parent');
         setSelectedParent('');
         setBreadcrumb([title]);
-        
-        setTimeout(() => {
-          setIsAnimating(false);
-        }, 800);
-      }, 100);
-    }
   };
 
   // Get current chart data based on level
@@ -119,10 +102,6 @@ export default function DrillDownPieChart({
     const currentData = getCurrentData();
     
     return {
-      animation: true,
-      animationDuration: 500,
-      animationEasing: 'cubicInOut',
-      animationDurationUpdate: 500,
       tooltip: {
         trigger: 'item',
         formatter: function(params: { name: string; value: number; percent: number }) {
@@ -218,33 +197,16 @@ export default function DrillDownPieChart({
           {currentLevel === 'child' && (
             <button
               onClick={handleDrillUp}
-              disabled={isAnimating}
-              className={`inline-flex items-center gap-2 px-2 py-1 rounded-lg font-medium transition-all duration-300 ${
-                isAnimating 
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-md transform hover:scale-105'
-              }`}
+              className={`inline-flex items-center gap-2 px-2 py-1 rounded-lg font-medium transition-all duration-300`}
             >
-              <svg className={`w-4 h-4 transition-transform duration-300 ${isAnimating ? 'animate-spin' : ''}`} 
+              <svg className={`w-4 h-4 transition-transform duration-300`} 
                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              {isAnimating ? 'Loading...' : `Back`}
             </button>
           )}
         </div>
       </div>
-
-      {isAnimating && (
-        <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-          <div className="flex items-center gap-3">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="text-gray-600 font-medium">
-              {currentLevel === 'parent' ? 'Drilling down...' : 'Going back...'}
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Chart Content */}
       <div className="p-6">
