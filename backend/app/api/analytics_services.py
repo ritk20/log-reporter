@@ -222,13 +222,13 @@ def r2(val):
 
 def compute_stats(values, prefix):
     return {
-        f"{prefix}average": r2(np.mean(values)),
-        f"{prefix}stdev": r2(np.std(values, ddof=1)) if len(values) > 1 else 0,
-        f"{prefix}min": r2(np.min(values)),
-        f"{prefix}max": r2(np.max(values)),
-        f"{prefix}percentile25": r2(np.percentile(values, 25)),
-        f"{prefix}percentile50": r2(np.percentile(values, 50)),
-        f"{prefix}percentile75": r2(np.percentile(values, 75)),
+        f"average{prefix}": r2(np.mean(values)),
+        f"stdev{prefix}": r2(np.std(values, ddof=1)) if len(values) > 1 else 0,
+        f"min{prefix}": r2(np.min(values)),
+        f"max{prefix}": r2(np.max(values)),
+        f"percentile25{prefix}": r2(np.percentile(values, 25)),
+        f"percentile50{prefix}": r2(np.percentile(values, 50)),
+        f"percentile75{prefix}": r2(np.percentile(values, 75)),
     }
 
 
@@ -266,20 +266,20 @@ def calculate_transaction_statistics(collection):
                     OffUs.append(amount)
 
     stats = {}
-    stats.update(compute_stats(processing_times, "processingTime_")) if processing_times else \
-        stats.update({k: 0 for k in compute_stats([0], "processingTime_").keys()})
+    stats.update(compute_stats(processing_times, "processingTime")) if processing_times else \
+        stats.update({k: 0 for k in compute_stats([0], "processingTime").keys()})
 
-    stats.update(compute_stats(transaction_amounts, "transactionAmount_")) if transaction_amounts else \
-        stats.update({k: 0 for k in compute_stats([0], "transactionAmount_").keys()})
+    stats.update(compute_stats(transaction_amounts, "transactionAmount")) if transaction_amounts else \
+        stats.update({k: 0 for k in compute_stats([0], "transactionAmount").keys()})
 
-    stats.update(compute_stats(OnUs, "transactionAmount_ONUS_")) if OnUs else \
-        stats.update({k: 0 for k in compute_stats([0], "transactionAmount_ONUS_").keys()})
+    stats.update(compute_stats(OnUs, "ONUSTransactionAmount")) if OnUs else \
+        stats.update({k: 0 for k in compute_stats([0], "ONUSTransactionAmount").keys()})
 
-    stats.update(compute_stats(OffUs, "transactionAmount_OFFUS_")) if OffUs else \
-        stats.update({k: 0 for k in compute_stats([0], "transactionAmount_OFFUS_").keys()})
+    stats.update(compute_stats(OffUs, "OFFUSTransactionAmount")) if OffUs else \
+        stats.update({k: 0 for k in compute_stats([0], "OFFUSTransactionAmount").keys()})
 
-    stats["totalAmount_ONUS"] = r2(sum(OnUs))
-    stats["totalAmount_OFFUS"] = r2(sum(OffUs))
+    stats["ONUSTotalAmount"] = r2(sum(OnUs))
+    stats["OFFUSTotalAmount"] = r2(sum(OffUs))
     return stats
 
 

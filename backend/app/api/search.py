@@ -12,6 +12,7 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 client = MongoClient(settings.MONGODB_URL)
 db = client[settings.MONGODB_DB_NAME]
 tokens_collection = db[settings.MONGODB_TOKENS_COLLECTION_NAME]
+master_collection = db[settings.MONGODB_COLLECTION_NAME]
 
 @router.get("/tokens")
 async def search_tokens(
@@ -176,8 +177,6 @@ async def search_transactions(
 ):
     """Search transactions by Transaction_Id in the master timeseries collection."""
     try:
-        master_collection = await get_collection()
-
         match_stage = {}
         pipeline = []
 
@@ -192,7 +191,7 @@ async def search_transactions(
                 raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
         # Transaction ID search
-        transaction_regex = re.compile(re.escape(query), re.IGNORECASE)
+        transaction_regex = re.compile(f"^{re.escape(query)}", re.IGNORECASE)
         match_stage["Transaction_Id"] = {"$regex": transaction_regex}
 
         pipeline.append({"$match": match_stage})
@@ -220,7 +219,7 @@ async def search_transactions(
                 "msgId": doc.get("Msg_id"),
                 "senderOrgId": doc.get("SenderOrgId"),
                 "receiverOrgId": doc.get("ReceiverOrgId"),
-                "amount": doc.get("amount"),
+                "amount": doc.get("Amount"),
                 "operation": doc.get("Operation"),
                 "type": doc.get("Type_Of_Transaction"),
                 "result": doc.get("Result_of_Transaction"),
@@ -244,6 +243,5 @@ async def search_transactions(
             "pagination": {"page": page, "limit": limit, "total": total, "pages": (total + limit - 1) // limit},
             "query": query
         }
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Transaction search failed: {str(e)}")
