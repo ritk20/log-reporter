@@ -1,19 +1,36 @@
 // components/search/SearchComponent.tsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 interface SearchResult {
+  //token ID/Serial No. results
   id?: string;
   tokenId?: string;
   serialNo?: string;
-  occurrenceCount?: number;
-  totalAmount?: number;
-  latestTransaction?: string;
-  organizations?: string[];
   amount?: string;
   currency?: string;
   timestamp?: string;
-  transactionId?: string;
+
+  // Transaction results
+  operation?: string;
+  type?: string;
+  result?: number;
+  errorCode?: string;
+  errorMsg?: string;
+  responseTimestamp?: string;
+  processingTime?: number;
+  inputs?: any[];
+  outputs?: any[];
+  numberOfInputs?: number;
+  numberOfOutputs?: number;
+  inputAmount?: number;
+  outputAmounts?: number[];
+
+  //common
+  transactionId: string;
+  msgId: string;
+  senderOrg: string;
+  receiverOrg: string;
 }
 type SearchType = 'token' | 'serial' | 'transaction';
 
@@ -124,7 +141,7 @@ export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComp
   }, []);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+    <div className="bg-white rounded-lg shadow-sm p-6 mb-6 hover:shadow-md transition-all duration-200">
       <div className="flex flex-col space-y-4">
         {/* Search Header */}
         <div className="flex items-center justify-between">

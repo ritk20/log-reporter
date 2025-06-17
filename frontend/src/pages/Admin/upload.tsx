@@ -5,7 +5,7 @@ import { useTask } from '../../hooks/useTask';
 
 export default function Upload() {
   const { user } = useAuth();
-  const { setTask } = useTask();
+  const { setTask, task } = useTask();
 
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState('');
@@ -53,12 +53,8 @@ export default function Upload() {
           error: null,
           progress: { current: 0, total: 100, message: 'Starting processing...' }
         });
-
-        // Immediately redirect to homepage
-        navigate('/');
       }
 
-      // Reset state for next upload
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
 
@@ -73,16 +69,18 @@ export default function Upload() {
     }
   };
 
+  const handleViewAnalysis = () => {
+    navigate('/analytics');
+  };
 
   return (
-    <div className="bg-gray-50 flex items-center justify-center">
+    <div className="bg-gray-50 h-screen overflow-hidden flex flex-col items-center justify-start pt-8">
       {/* Card Container */}
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm transform transition-all hover:shadow-2xl hover:-translate-y-1">
+      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm mb-6">
         <h1 className="text-2xl font-bold text-center text-gray-800 mb-8">
           Logs Uploader
         </h1>
 
-        {/* Hidden native file input */}
         <input
           ref={fileInputRef}
           type="file"
@@ -95,7 +93,6 @@ export default function Upload() {
           }}
         />
 
-        {/* Choose File Button */}
         <button
           onClick={() => fileInputRef.current?.click()}
           className="w-full flex items-center justify-center px-4 py-2 border-2 border-blue-600 text-blue-600 rounded-lg mb-6 transition-all hover:bg-blue-50 hover:scale-105 active:scale-95 focus:outline-none"
@@ -103,25 +100,83 @@ export default function Upload() {
           {file ? file.name : 'Choose File'}
         </button>
 
-        {/* Upload Button */}
         <button
           onClick={handleUpload}
-          className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg transition-all hover:bg-blue-700 hover:scale-105 active:scale-95 focus:outline-none"
+          disabled={task?.status === 'uploading' || task?.status === 'processing'}
+          className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg transition-all hover:bg-blue-700 hover:scale-105 active:scale-95 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         >
-          UPLOAD FILE
+          {task?.status === 'uploading' || task?.status === 'processing' ? 'UPLOADING...' : 'UPLOAD FILE'}
         </button>
 
-        {/* Message */}
         {message && (
-          <p
-            className={`mt-6 text-center font-medium ${
-              message.toLowerCase().includes('failed') ? 'text-red-600' : 'text-green-600'
-            }`}
-          >
+          <p className={`mt-6 text-center font-medium ${message.toLowerCase().includes('failed') ? 'text-red-600' : 'text-green-600'}`}>
             {message}
           </p>
         )}
       </div>
+
+      {/* Status Cards Below Upload Card */}
+      {task?.progress && (task?.status === 'uploading' || task?.status === 'processing') && (
+        <div className="w-full max-w-sm bg-white rounded-xl shadow-md p-6 mb-6">
+          <div className="flex items-center justify-center mb-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+            <span className="text-lg font-semibold text-gray-700">Processing...</span>
+          </div>
+          <div className="flex justify-between text-sm text-gray-600 mb-3">
+            <span className="font-medium">{task.progress.message}</span>
+            <span className="font-bold text-blue-600">{task.progress.current}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500 ease-out shadow-sm"
+              style={{ width: `${task.progress.current}%` }}
+            ></div>
+          </div>
+          <div className="mt-3 text-xs text-gray-500 text-center">
+            Please wait while we process your file...
+          </div>
+        </div>
+      )}
+
+      {task?.status === 'completed' && (
+        <div className="w-full max-w-sm bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-lg border border-green-200 p-6 mb-6">
+          <div className="text-center">
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+              <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-green-800 mb-2">Upload Complete!</h3>
+            <p className="text-sm text-green-600 mb-6">Your file has been processed successfully</p>
+            <button
+              onClick={handleViewAnalysis}
+              className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:from-green-700 hover:to-emerald-700 hover:scale-105 active:scale-95 focus:outline-none"
+            >
+              🔍 VIEW ANALYSIS
+            </button>
+          </div>
+        </div>
+      )}
+
+      {task?.status === 'failed' && (
+        <div className="w-full max-w-sm bg-gradient-to-br from-red-50 to-pink-50 rounded-xl shadow-lg border border-red-200 p-6 mb-6">
+          <div className="text-center">
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+              <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-red-800 mb-2">Upload Failed</h3>
+            <p className="text-sm text-red-600 mb-4">{task.error || 'Something went wrong'}</p>
+            <button
+              onClick={() => setTask({ taskId: null, status: 'idle', error: null, progress: null })}
+              className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

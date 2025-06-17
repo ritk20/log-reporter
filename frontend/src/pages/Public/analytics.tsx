@@ -139,6 +139,7 @@ export default function AnalyticsPage() {
     switch (appliedFilters.type) {
       case 'range':
         return { date: `${appliedFilters.startDate}:${appliedFilters.endDate}` };
+        return { date: `${appliedFilters.startDate}:${appliedFilters.endDate}` };
       case 'single':
         return { date: appliedFilters.startDate };
       case 'relative': {
@@ -172,6 +173,7 @@ export default function AnalyticsPage() {
 
     // Update applied filters (this will trigger data fetch)
     setAppliedFilters({ ...selectedFilters });
+    console.log(appliedFilters)
 
     // Update URL params for deep linking
   const params = new URLSearchParams();

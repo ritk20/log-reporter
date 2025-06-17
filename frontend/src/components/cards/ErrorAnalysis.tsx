@@ -136,13 +136,13 @@ export default function ErrorAnalysisCard({ errorData }: ErrorAnalysisProps) {
   return (
     <div className="flex-1">
       {/* Card Header with Toggle */}
-      <div className="px-6 py-4 border-b border-gray-200">
+      <div className="px-4 py-4 border-b border-gray-200">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h3 className="text-lg font-semibold text-gray-900">Error Analysis</h3>
+          <h3 className="text-md font-semibold text-gray-900">Error Analysis</h3>
           
           {/* Toggle Switch */}
           <div className="flex items-center gap-3">
-            <span className={`text-sm font-medium ${analysisType === 'operation' ? 'text-blue-600' : 'text-gray-500'}`}> 
+            <span className={`text-xs font-medium ${analysisType === 'operation' ? 'text-blue-600' : 'text-gray-500'}`}> 
               Operation vs Error
             </span>
             <button
@@ -157,7 +157,7 @@ export default function ErrorAnalysisCard({ errorData }: ErrorAnalysisProps) {
                 }`}
               />
             </button>
-            <span className={`text-sm font-medium ${analysisType === 'type' ? 'text-blue-600' : 'text-gray-500'}`}> 
+            <span className={`text-xs font-medium ${analysisType === 'type' ? 'text-blue-600' : 'text-gray-500'}`}> 
               Type vs Error
             </span>
           </div>
