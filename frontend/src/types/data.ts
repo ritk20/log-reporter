@@ -18,6 +18,60 @@ export type Tx = {
   number_of_outputs: number
 }
 
+export interface Token {
+  tokenId: string;
+  msgId: string;
+  serialNo: string;
+  amount: string;
+  currency: string;
+  timestamp: string;
+  transactionId: string;
+  senderOrg: string;
+  receiverOrg: string;
+}
+
+// TODO: merge with Tx ASAP
+export interface Transaction {
+  Transaction_Id: string;
+  Msg_id: string;
+  Type_Of_Transaction: string;
+  Operation: string;
+  Amount: string;
+  Time_to_Transaction_secs: number;
+  Result_of_Transaction: number;
+  Request_timestamp: string;
+  Response_timestamp: string;
+  SenderOrgId: string;
+  ReceiverOrgId: string;
+  Inputs: Array<{
+    id: string;
+    serialNo: string;
+    value: string;
+    currency: string;
+    creationTimestamp: string;
+    issuerSignature: string;
+    ownerAddress: string;
+  }>;
+  Outputs: Array<{
+    value: string;
+    OutputIndex: string;
+  }>;
+  Resptokens: Array<{
+    id: string;
+    serialNo: string;
+    value: string;
+    currency: string;
+    creationTimestamp: string;
+    issuerSignature: string;
+    ownerAddress: string;
+  }>;
+  ErrorCode: string;
+  ErrorMsg: string;
+  NumberOfInputs: number;
+  NumberOfOutputs: number;
+}
+
+
 export interface AmountInterval {
   interval: string;
   total: number;
@@ -74,28 +128,14 @@ export type TxSummary = {
   total: number
   successRate: number
   averageProcessingTime: number
-  stdevProcessingTime: number
   minProcessingTime: number
   maxProcessingTime: number
-  percentile25ProcessingTime: number
-  percentile50ProcessingTime: number
-  percentile75ProcessingTime: number
   averageONUSTransactionAmount: number
-  stdevONUSTransactionAmount: number
   minONUSTransactionAmount: number
   maxONUSTransactionAmount: number
-  percentile25ONUSTransactionAmount: number
-  percentile50ONUSTransactionAmount: number
-  percentile75ONUSTransactionAmount: number
   averageOFFUSTransactionAmount: number
-  stdevOFFUSTransactionAmount: number
   minOFFUSTransactionAmount: number
   maxOFFUSTransactionAmount: number
-  percentile25OFFUSTransactionAmount: number
-  percentile50OFFUSTransactionAmount: number
-  percentile75OFFUSTransactionAmount: number
-  successes: Record<Tx['type'], Record<Tx['operation'], number>>  //successful type-op
-  failures: Record<Tx['type'], Record<Tx['operation'], number>> //failed type-op
   operation: Record<Tx['operation'], number> //all operation types (redundant)
   type: Record<Tx['type'],number> // all transaction type (redundant)
   error: Record<Tx['error'], number>  //all error divisions (redundant)
@@ -104,11 +144,8 @@ export type TxSummary = {
   crossOpType: Record<Tx['operation'], Record<Tx['type'], number>>
   crossTypeError: Record<Tx['type'], Record<Tx['error'], number>> //redundant
   crossOpError: Record<Tx['operation'], Record<Tx['error'], number>>  //redundant
-  amountDistribution: Array<{ x: number; y: number; type?: Tx['type'] }>
   mergedTransactionAmountIntervals: AmountInterval[]
-  processingTimeByInputs: Array<{ x: number; y: number }>
-  processingTimeByOutputs: Array<{ x: number; y: number }>
   duplicateTokens: DuplicateToken[]
   temporal?: AggEntry[]
-    transactionStatsByhourInterval: AggEntry[]
+  transactionStatsByhourInterval?: AggEntry[]
 }
