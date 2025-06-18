@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useTask } from '../../hooks/useTask';
-import { useState, useEffect, useRef, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -101,7 +101,6 @@ export function Header() {
         <div className="flex items-center space-x-4">
           {/* Notification Bell */}
           <div className="relative" ref={notificationRef}>
-          <div className="relative" ref={notificationRef}>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="relative p-2 text-gray-600 hover:text-gray-800 focus:outline-none"
@@ -126,7 +125,7 @@ export function Header() {
                         <div className="flex items-center space-x-2">
                           <span className="text-lg">{getStatusIcon()}</span>
                           <div>
-                            <p className="font-medium text-sm">Current Task</p>
+                            <p className="font-medium text-sm">Current Analysis</p>
                             <p className="text-xs text-gray-600">{getStatusMessage()}</p>
                           </div>
                         </div>
@@ -164,7 +163,7 @@ export function Header() {
                               </span>
                               <div>
                                 <p className="text-xs font-medium">
-                                  Task {historyTask.status}
+                                  Analysis {historyTask.status}
                                 </p>
                                 <p className="text-xs text-gray-500">
                                   {historyTask.completedAt ? new Date(historyTask.completedAt).toLocaleDateString() : 'N/A'}
@@ -203,6 +202,7 @@ export function Header() {
 
           <nav className="flex space-x-4 text-gray-700 font-medium">
             <Link to="/analytics" className="hover:text-blue-600 transition-colors">Analytics</Link>
+            <Link to="/query" className="hover:text-blue-600 transition-colors">Query</Link>
             <Link to="/search" className="hover:text-blue-600 transition-colors">Search</Link>
             {user.role === 'admin' && (
               <>
