@@ -5,11 +5,12 @@ import { RoleBasedRoute } from './components/auth/RoleBasedRoute';
 import { PrivateRoute } from './components/auth/PrivateRoute';
 import Login from './pages/Auth/Login';
 import Upload from './pages/Admin/upload';
+// import Dashboard from './pages/Admin/Dashboard';
 import AnalyticsDashboard from './pages/Public/analytics';
 import { ErrorBoundary } from './components/public/ErrorBoundary';
 import { TaskProvider } from './contexts/TaskProvider';
 import Search from './pages/Public/Search';
-import './index.css'; // Ensure global styles are applied
+import TransactionFilters from './pages/Public/Query';
 
 function App() {
   return (
@@ -25,10 +26,11 @@ function App() {
                 {/* Admin Routes */}
                 <Route element={<RoleBasedRoute allowedRoles={['admin']} />}>
                   <Route path="/admin/upload" element={<Upload />} />
+                  {/* <Route path="/admin/dashboard" element={<Dashboard />} /> */}
                 </Route>
                 
                 <Route path="*" element={<Navigate to="/unauthorized" replace />} />
-
+                
                 {/* Analytics - Available to all authenticated users */}
                 <Route element={<PrivateRoute />}>
                   <Route path="/analytics" element={<AnalyticsDashboard />} />
@@ -36,12 +38,11 @@ function App() {
                 <Route element={<PrivateRoute />}>
                   <Route path="/search" element={<Search />} />
                 </Route>
+                <Route element={<PrivateRoute />}>
+                  <Route path='/query' element={<TransactionFilters/>} />              
+                </Route>
                 
-                <Route path="/unauthorized" element={
-                  <div className="text-red-500 flex justify-center text-2xl font-semibold">
-                    Access Denied
-                  </div>
-                } />
+                <Route path="/unauthorized" element={<div className='text-red-500 flex justify-center text-2xl font-semibold'>Access Denied</div>} />
               </Routes>
             </Layout>
           </BrowserRouter>
@@ -50,6 +51,5 @@ function App() {
     </AuthProvider>
   );
 }
-
 
 export default App;
