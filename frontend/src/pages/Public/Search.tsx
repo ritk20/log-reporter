@@ -2,31 +2,22 @@ import { useState } from "react";
 import { SearchComponent } from "../../components/public/SearchBar";
 import { SearchResults } from "../../components/public/SearchResults";
 import { useSearchParams } from "react-router-dom";
+import type { SearchResult } from "../../components/public/SearchResults";
+import type { Token, Transaction } from "../../types/data";
 
-
-// Add missing interface
-interface SearchResult {
-  id?: string;
-  tokenId?: string;
-  serialNo?: string;
-  amount?: string;
-  currency?: string;
-  timestamp?: string;
-  transactionId?: string;
-  senderOrg?: string;
-  receiverOrg?: string;
-}
 
 export default function Search() {
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResult>({
+    token: [] as Token[],
+    transaction: [] as Transaction[],
+  });
   const [searchTotal, setSearchTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false); // Add loading state
   const [searchParams] = useSearchParams();
 
    // Track if a search has been performed
   const [hasSearched, setHasSearched] = useState(false);
-  console.log(searchParams);
-  const handleSearchResults = (results: SearchResult[], total: number) => {
+  const handleSearchResults = (results: SearchResult, total: number) => {
     setSearchResults(results);
     setSearchTotal(total);
     setHasSearched(true);

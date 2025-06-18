@@ -1,41 +1,16 @@
 // components/search/SearchComponent.tsx
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import type { Token, Transaction } from '../../types/data';
 
-interface SearchResult {
-  //token ID/Serial No. results
-  id?: string;
-  tokenId?: string;
-  serialNo?: string;
-  amount?: string;
-  currency?: string;
-  timestamp?: string;
-
-  // Transaction results
-  operation?: string;
-  type?: string;
-  result?: number;
-  errorCode?: string;
-  errorMsg?: string;
-  responseTimestamp?: string;
-  processingTime?: number;
-  inputs?: any[];
-  outputs?: any[];
-  numberOfInputs?: number;
-  numberOfOutputs?: number;
-  inputAmount?: number;
-  outputAmounts?: number[];
-
-  //common
-  transactionId: string;
-  msgId: string;
-  senderOrg: string;
-  receiverOrg: string;
+export interface SearchResult {
+  token: Token[];
+  transaction: Transaction[];
 }
 type SearchType = 'token' | 'serial' | 'transaction';
 
 interface SearchComponentProps {
-  onResultsUpdate?: (results: SearchResult[], total: number) => void;
+  onResultsUpdate?: (results: SearchResult, total: number) => void;
   onLoadingChange?: (isLoading: boolean) => void;
 }
 
@@ -43,7 +18,10 @@ export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComp
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('search') || '');
   const [searchType, setSearchType] = useState<SearchType>('token');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<SearchResult>({
+    token: [] as Token[],
+    transaction: [] as Transaction[]
+  });
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -58,8 +36,14 @@ export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComp
   // Perform search
   const performSearch = async (searchQuery: string, page: number = 1) => {
     if (!searchQuery.trim()) {
-      setResults([]);
-      onResultsUpdate?.([], 0);
+      setResults({
+        token: [],
+        transaction: []});
+      onResultsUpdate?.( {
+        token: [],
+        transaction: []},
+        0
+      );
       return;
     }
     
@@ -94,15 +78,25 @@ export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComp
       }
 
       const data = await response.json();
-      console.log(data)
-      setResults(data.results);
+      const normalizedResults = {
+        token: data.results.token || [],
+        transaction: data.results.transaction || []
+      };
+      setResults(normalizedResults);
       setPagination(data.pagination);
       onResultsUpdate?.(data.results, data.pagination.total);
 
     } catch (error) {
       console.error('Search error:', error);
-      setResults([]);
-      onResultsUpdate?.([], 0);
+      setResults({
+        token: [],
+        transaction: []}
+      );
+      onResultsUpdate?.({
+        token: [],
+        transaction: []},
+        0
+      );
     } finally {
       setLoading(false);
       if (onLoadingChange) onLoadingChange(false); // Notify parent
@@ -130,14 +124,14 @@ export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComp
     const searchQuery = searchParams.get('search');
     const searchTypeParam = searchParams.get('search_type') as SearchType;
     
-    if (initialLoad.current && searchQuery) {
-      setQuery(searchQuery);
-      if (searchTypeParam) {
-        setSearchType(searchTypeParam);
-      }
-      performSearch(searchQuery);
-      initialLoad.current = false;
+    if (searchQuery) {
+        setQuery(searchQuery);
+        if (searchTypeParam) {
+            setSearchType(searchTypeParam);
+        }
+        performSearch(searchQuery);
     }
+    initialLoad.current = false;
   }, []);
 
   return (
@@ -153,9 +147,18 @@ export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComp
               onChange={(e) => {
                 setSearchType(e.target.value as SearchType);
                 setQuery('');
-                setResults([]);
+                setResults({
+                  token: [],
+                  transaction: []}
+                );
                 setSearchParams();
-                onResultsUpdate?.([], 0);
+                onResultsUpdate?.({
+                  token: [],
+                  transaction: []}, 
+                  0
+                );
+                const params = new URLSearchParams();
+                params.delete('search');
               }}
               className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
@@ -200,10 +203,10 @@ export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComp
         </div>
 
         {/* Results Summary */}
-        {results.length > 0 && (
+        {(results.token.length > 0 || results.transaction.length > 0) && (
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span>
-              Showing {results.length} of {pagination.total} results for "{query}"
+              Showing {results.token.length || results.transaction.length} of {pagination.total} results for "{query}"
             </span>
             {pagination.pages > 1 && (
               <div className="flex items-center space-x-2">
