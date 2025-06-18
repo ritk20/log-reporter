@@ -63,6 +63,7 @@ export function useAnalytics(queryParams: QueryParams) {
         }
 
         const jsonData = await response.json();
+        console.log("date", jsonData)
         // Store in cache
         cache.current.set(queryString, jsonData);
         setData(jsonData);

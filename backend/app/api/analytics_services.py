@@ -223,12 +223,8 @@ def r2(val):
 def compute_stats(values, prefix):
     return {
         f"average{prefix}": r2(np.mean(values)),
-        f"stdev{prefix}": r2(np.std(values, ddof=1)) if len(values) > 1 else 0,
         f"min{prefix}": r2(np.min(values)),
         f"max{prefix}": r2(np.max(values)),
-        f"percentile25{prefix}": r2(np.percentile(values, 25)),
-        f"percentile50{prefix}": r2(np.percentile(values, 50)),
-        f"percentile75{prefix}": r2(np.percentile(values, 75)),
     }
 
 

@@ -37,6 +37,7 @@ export default function Upload() {
 
       const response = await fetch('http://localhost:8000/api/upload/upload', {
         method: 'POST',
+        credentials: 'include',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
@@ -152,7 +153,7 @@ export default function Upload() {
               onClick={handleViewAnalysis}
               className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:from-green-700 hover:to-emerald-700 hover:scale-105 active:scale-95 focus:outline-none"
             >
-              🔍 VIEW ANALYSIS
+              🔍 Go To All-Time Analysis
             </button>
           </div>
         </div>

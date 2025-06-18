@@ -1,20 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import '../../components/charts/echartsSetup.ts'
-import ScatterChart from '../../components/charts/Scatter.tsx';
 import Histogram from '../../components/charts/Histogram.tsx';
 import DuplicateTokensTable from '../../components/cards/DuplicateTokens.tsx';
 // import TokenFlowGraph from '../../components/graphs/FlowGraph.tsx';
 
-//TODO: Replace with real data fetching logic
 import './print-analytics.css';
 
 import { useAnalytics } from '../../hooks/useAnalytics.tsx';
 import { LoadingSpinner } from '../../components/public/Loading.tsx';
 import TemporalDashboard from '../../components/charts/TimeSeries.tsx';
 import ErrorAnalysisCard from '../../components/cards/ErrorAnalysis.tsx';
-import KPICard from '../../components/public/KPIcards.tsx';
+import KPICard from '../../components/cards/KPIcards.tsx';
 import DrillDownPieChart from '../../components/charts/Pie.tsx';
+import PerformanceDashboard from '../../components/cards/PerformanceCard.tsx';
+
+// Date range state management
+  type FilterType = {
+    type: 'all' | 'single' | 'range' | 'relative';
+    startDate: string;
+    endDate: string;
+    relativePeriod: string;
+  };
 
 //TODO: add timeValue and timeUnit to the API call
 export default function AnalyticsPage() {
@@ -22,14 +29,46 @@ export default function AnalyticsPage() {
     // const [timeValue, setTimeValue] = useState<number>(24); 
     // const [timeUnit, setTimeUnit] = useState<string>('hours');
 
-    const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Date range state management
-  const [appliedFilters, setAppliedFilters] = useState({
-    type: 'all' as 'all' | 'single' | 'range' | 'relative',
-    startDate: '',
-    endDate: '',
-    relativePeriod: 'last7days'
+  const [appliedFilters, setAppliedFilters] = useState<FilterType>(() => {
+    const dateParam = searchParams.get('date') || 'all';
+    const rangeParam = searchParams.get('range');
+    const relativeParam = searchParams.get('relative');
+
+    let initialFilters: FilterType;
+    if (rangeParam) {
+      const [start, end] = rangeParam.split(':');
+      initialFilters = {
+        type: 'range',
+        startDate: start,
+        endDate: end,
+        relativePeriod: 'last7days'
+      };
+    } else if (relativeParam) {
+      initialFilters = {
+        type: 'relative',
+        startDate: '',
+        endDate: '',
+        relativePeriod: relativeParam
+      };
+    } else if (dateParam !== 'all') {
+      initialFilters = {
+        type: 'single',
+        startDate: dateParam,
+        endDate: '',
+        relativePeriod: 'last7days'
+      };
+    } else {
+      initialFilters = {
+        type: 'all',
+        startDate: '',
+        endDate: '',
+        relativePeriod: 'last7days'
+      };
+    }
+
+    return initialFilters;
   });
 
   // UI selection state (doesn't trigger data fetch)
@@ -139,7 +178,6 @@ export default function AnalyticsPage() {
     switch (appliedFilters.type) {
       case 'range':
         return { date: `${appliedFilters.startDate}:${appliedFilters.endDate}` };
-        return { date: `${appliedFilters.startDate}:${appliedFilters.endDate}` };
       case 'single':
         return { date: appliedFilters.startDate };
       case 'relative': {
@@ -176,29 +214,27 @@ export default function AnalyticsPage() {
     console.log(appliedFilters)
 
     // Update URL params for deep linking
-  const params = new URLSearchParams();
-  switch (selectedFilters.type) {
-    case 'range':
-      if (selectedFilters.startDate && selectedFilters.endDate) {
-        // FIX: Use single parameter for range
-        params.set('range', `${selectedFilters.startDate}:${selectedFilters.endDate}`);
-      }
-      break;
-    case 'single':
-      if (selectedFilters.startDate) {
-        params.set('date', selectedFilters.startDate);
-      }
-      break;
-    case 'relative':
-      { params.set('relative', selectedFilters.relativePeriod);
-      const { startDate, endDate } = calculateRelativeDates(selectedFilters.relativePeriod);
-      params.set('range', `${startDate}:${endDate}`);
-      break; }
-    default:
-      params.set('date', 'all');
-  }
-  setSearchParams(params);
-
+    const params = new URLSearchParams();
+    switch (selectedFilters.type) {
+      case 'range':
+        if (selectedFilters.startDate && selectedFilters.endDate) {
+          params.set('range', `${selectedFilters.startDate}:${selectedFilters.endDate}`);
+        }
+        break;
+      case 'single':
+        if (selectedFilters.startDate) {
+          params.set('date', selectedFilters.startDate);
+        }
+        break;
+      case 'relative':
+        { params.set('relative', selectedFilters.relativePeriod);
+        const { startDate, endDate } = calculateRelativeDates(selectedFilters.relativePeriod);
+        params.set('range', `${startDate}:${endDate}`);
+        break; }
+      default:
+        params.set('date', 'all');
+    }
+    setSearchParams(params);
   };
 
   // Reset filters
@@ -214,19 +250,19 @@ export default function AnalyticsPage() {
     setSearchParams({ date: 'all' });
   };
 
-    if (isLoading) {
-      return <LoadingSpinner/>
-    }
+  if (isLoading) {
+    return <LoadingSpinner/>
+  }
 
-    if (error) {
-      return <div className="text-red-500 text-center p-4">Error: {error}</div>;
-    }
+  if (error) {
+    return <div className="text-red-500 text-center p-4">Error: {error}</div>;
+  }
 
-    if (!data) {
-      return <div className="text-center p-4">No data available</div>;
-    }
+  if (!data) {
+    return <div className="text-center p-4">No data available</div>;
+  }
 
-    const handleDownloadPDF = () => {
+  const handleDownloadPDF = () => {
     // Hide the download button before printing
     const downloadBtn = document.getElementById('download-pdf-btn');
     if (downloadBtn) {
@@ -514,36 +550,24 @@ export default function AnalyticsPage() {
             <KPICard
               title="OFFUS Transaction Amount"
               mean={data.averageOFFUSTransactionAmount}
-              stdev={data.stdevOFFUSTransactionAmount}
               min={data.minOFFUSTransactionAmount}
               max={data.maxOFFUSTransactionAmount}
-              percentile25={data.percentile25OFFUSTransactionAmount}
-              percentile50={data.percentile50OFFUSTransactionAmount}
-              percentile75={data.percentile75OFFUSTransactionAmount}
               unit=" Rs" //hardcoded to Rs
               colorScheme="blue"
             />
             <KPICard
               title="ONUS Transaction Amount"
               mean={data.averageONUSTransactionAmount}
-              stdev={data.stdevONUSTransactionAmount}
               min={data.minONUSTransactionAmount}
               max={data.maxONUSTransactionAmount}
-              percentile25={data.percentile25ONUSTransactionAmount}
-              percentile50={data.percentile50ONUSTransactionAmount}
-              percentile75={data.percentile75ONUSTransactionAmount}
               unit=" Rs" //hardcoded to Rs
               colorScheme="purple"
             />
             <KPICard
               title="Processing Time"
               mean={data.averageProcessingTime}
-              stdev={data.stdevProcessingTime}
               min={data.minProcessingTime}
               max={data.maxProcessingTime}
-              percentile25={data.percentile25ProcessingTime}
-              percentile50={data.percentile50ProcessingTime}
-              percentile75={data.percentile75ProcessingTime}
               unit="s"
               colorScheme="green"
             />
@@ -602,16 +626,16 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Performance Scatter</h3>
+            <h2 className="text-lg font-semibold text-gray-900">Performance Analysis</h2>
           </div>
-          <div className="p-6">
-            <div className="h-64">
-              <ScatterChart title='Processing Time vs Input Tokens' data={data.processingTimeByInputs} />
-            </div>
-          </div>
+          <PerformanceDashboard
+            dateFilter={appliedFilters.type === 'all' ? 'all' : 
+                      appliedFilters.type === 'range' ? `${appliedFilters.startDate}:${appliedFilters.endDate}` :
+                      appliedFilters.type === 'relative' ? `${calculateRelativeDates(appliedFilters.relativePeriod).startDate}:${calculateRelativeDates(appliedFilters.relativePeriod).endDate}` :
+                      appliedFilters.startDate} 
+          />
         </div>
 
         {/* Bottom Section - Data Tables */}
@@ -626,12 +650,16 @@ export default function AnalyticsPage() {
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
             <TemporalDashboard
-              aggregatedData={data.temporal ?? data.transactionStatsByhourInterval.map(e => ({
-                ...e,
-                byType: e.byType || {},
-                byOp: e.byOp || {},
-                byErr: e.byErr || {}
-              }))}
+              aggregatedData={
+                data.temporal
+                  ?? data.transactionStatsByhourInterval?.map(e => ({
+                    ...e,
+                    byType: e.byType || {},
+                    byOp: e.byOp || {},
+                    byErr: e.byErr || {}
+                  }))
+                  ?? []
+              }
               isHourlyData={!data.temporal}
             />
         </div>
