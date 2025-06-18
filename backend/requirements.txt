@@ -1,6 +1,5 @@
 fastapi[standard]
-pandas
 pymongo
 dotenv
-motorpi
 python-jose
+bycrypt
