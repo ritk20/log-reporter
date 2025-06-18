@@ -31,7 +31,7 @@ def get_error_docs_excluding_noerror(collection: Collection):
     # Retrieve documents for all error codes except "noerror"
     pipeline = [
         {
-            "$match": {"ErrorCode": {"$ne": "noerror"}}  # Exclude "noerror"
+            "$match": {"ErrorCode": {"$ne": "No error"}}  # Exclude "noerror"
         }
     ]
     # Perform the aggregation to fetch documents
@@ -192,7 +192,7 @@ def get_hour_interval_stats(collection: Collection):
     interval_duration = timedelta(hours=1)  # 1 hour intervals
 
     cursor = collection.find({}, projection=[
-        "Request_timestamp", "Result_of_Transaction", "input_amount", "Time_to_Transaction_secs", "ErrorCode",  "Type_Of_Transaction", "SenderOrgId", "ReceiverOrgId"
+        "Request_timestamp", "Result_of_Transaction", "input_amount", "Time_to_Transaction_secs", "ErrorCode",  "Type_Of_Transaction","Operation", "SenderOrgId", "ReceiverOrgId"
     ])
 
     buckets = {}
@@ -212,7 +212,9 @@ def get_hour_interval_stats(collection: Collection):
                 "error_count": 0,
                 "total_amount": 0,
                 "total_time": 0,
-                "byType": {"LOAD": 0, "TRANSFER": 0, "REDEEM": 0}  # Initialize the byType dictionary
+                "byType": {"LOAD": 0, "TRANSFER": 0, "REDEEM": 0},  # Initialize the byType dictionary
+            
+                "byOp": {"MERGE": 0, "ISSUE": 0, "SPLIT": 0}  # Initialize the byOp dictionary
             }
         buckets[bucket_start]["transaction_count"] += 1
         if doc["ReceiverOrgId"]==doc["SenderOrgId"]:
@@ -234,6 +236,9 @@ def get_hour_interval_stats(collection: Collection):
         typ = doc.get("Type_Of_Transaction", "UNKNOWN").upper()  # Ensure we handle case insensitivity
         if typ in buckets[bucket_start]["byType"]:
             buckets[bucket_start]["byType"][typ] += 1
+        op = doc.get("Operation", "UNKNOWN").upper()  # Ensure we handle case insensitivity
+        if op in buckets[bucket_start]["byOp"]:
+            buckets[bucket_start]["byOp"][op] += 1
 
     interval_stats = []
     for start_time in sorted(buckets.keys()):
@@ -254,7 +259,8 @@ def get_hour_interval_stats(collection: Collection):
             "error_count": stats["error_count"],
             "sum_amount": stats["total_amount"],
             "average_processing_time": avg_processing_time,  # Add average processing time here
-            "byType": stats["byType"]
+            "byType": stats["byType"],
+            "byOp": stats["byOp"]
         })
     return interval_stats
 import numpy as np
@@ -266,12 +272,8 @@ def r2(val):
 def compute_stats(values, prefix):
     return {
         f"{prefix}average": r2(np.mean(values)),
-        f"{prefix}stdev": r2(np.std(values, ddof=1)) if len(values) > 1 else 0,
         f"{prefix}min": r2(np.min(values)),
         f"{prefix}max": r2(np.max(values)),
-        f"{prefix}percentile25": r2(np.percentile(values, 25)),
-        f"{prefix}percentile50": r2(np.percentile(values, 50)),
-        f"{prefix}percentile75": r2(np.percentile(values, 75)),
     }
 
 
@@ -556,12 +558,6 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
     total_transactions = 0
     total_success = 0
     total_processing_time = 0
-    merged_transaction_amount_intervals = defaultdict(lambda: {
-    "total": 0,
-    "load": 0,
-    "transfer": 0,
-    "redeem": 0
-})
     cross_type_op = defaultdict(lambda: defaultdict(int))
     cross_op_type = defaultdict(lambda: defaultdict(int))
     cross_type_error = defaultdict(lambda: defaultdict(int))
@@ -569,6 +565,12 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
     processing_time_by_inputs = defaultdict(list)
     processing_time_by_outputs = defaultdict(list)
     merged_tokens = {}
+    merged_transaction_amount_intervals = defaultdict(lambda: {
+    "total": 0,
+    "load": 0,
+    "transfer": 0,
+    "redeem": 0
+    })
     
     # transaction_stats = {}  # Additional transaction stats can be added here
 
@@ -606,8 +608,6 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
                 merged_transaction_amount_intervals[interval]["load"] += x.get("load", 0)
                 merged_transaction_amount_intervals[interval]["transfer"] += x.get("transfer", 0)
                 merged_transaction_amount_intervals[interval]["redeem"] += x.get("redeem", 0)
-            
-
         # Aggregate cross-type operation counts
         for t, op_dict in summary.get("crossTypeOp", {}).items():
             for op, count in op_dict.items():
@@ -673,6 +673,17 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
     merged_token_list = list(merged_tokens.values())
     temporal = get_temporal(daily_collection, start_date, end_date)
     aggregate_transaction_stats=calculate_aggregate_statistics(daily_collection, start_date, end_date)
+    merged_transaction_amounts_intervals = [{"index": key, **value} for key, value in merged_transaction_amount_intervals.items()]
+
+
+
+
+
+
+
+
+
+
             
     # Calculate overall success rate and average processing time
     success_rate = (total_success / total_transactions) * 100 if total_transactions else 0
@@ -686,7 +697,7 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
         "error": dict(error_counts),
         "errorDocs": error_docs,
         "result": dict(result_counts),
-        "mergedTransactionAmountIntervals": merged_transaction_amount_intervals, 
+        "mergedTransactionAmountIntervals": merged_transaction_amounts_intervals, 
         "total": total_transactions,
         "successRate": success_rate,
         "crossTypeOp": cross_type_op,
