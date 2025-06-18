@@ -40,14 +40,12 @@ async def connect_to_mongo():
         temptoken_coll = database[settings.MONGODB_TEMP_TOKENS_COLLECTION_NAME]
         daily_collection = database[settings.MONGODB_DAILY_SUMM_COLLECTION_NAME]
         overall_collection = database[settings.MONGODB_SUMM_COLLECTION_NAME]
-        refresh_token_coll = database[settings.MONGODB_REFRESH_TOKEN_NAME]  # NEW
 
         mongodb.token_coll = token_coll
         mongodb.temp_coll = temp_coll
         mongodb.temptoken_coll = temptoken_coll
         mongodb.daily_summary = daily_collection
         mongodb.overall_summary = overall_collection
-        mongodb.refresh_token_coll = refresh_token_coll  # NEW
 
         initialize_collections()
 

@@ -28,6 +28,7 @@ class Settings:
     # MongoDB settings
     MONGODB_URL: str = os.getenv("MONGODB_URL")
     MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "logs2")
+    MONGODB_LOGIN: str = os.getenv("MONGODB_LOGIN")
     MONGODB_COLLECTION_NAME: str = os.getenv("MONGODB_COLLECTION_NAME", "master2")
     MONGODB_DAILY_SUMM_COLLECTION_NAME: str = os.getenv("MONGODB_DAILY_SUMM_COLLECTION_NAME","Daily_Transaction_Summary2")
     MONGODB_SUMM_COLLECTION_NAME: str = os.getenv("MONGODB_SUMM_COLLECTION_NAME","Transaction_summary2")
