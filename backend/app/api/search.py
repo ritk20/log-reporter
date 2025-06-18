@@ -12,6 +12,7 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 client = MongoClient(settings.MONGODB_URL)
 db = client[settings.MONGODB_DB_NAME]
 tokens_collection = db[settings.MONGODB_TOKENS_COLLECTION_NAME]
+master_collection = db[settings.MONGODB_COLLECTION_NAME]
 
 @router.get("/tokens")
 async def search_tokens(
@@ -81,7 +82,9 @@ async def search_tokens(
         ]
 
         return {
-            "results": processed_results,
+            "results": {
+                "token": processed_results
+            },
             "pagination": {"page": page, "limit": limit, "total": total, "pages": (total + limit - 1) // limit},
             "query": query
         }
@@ -158,7 +161,9 @@ async def search_serial_numbers(
         ]
 
         return {
-            "results": processed_results,
+            "results": {
+                "token": processed_results
+            },
             "pagination": {"page": page, "limit": limit, "total": total, "pages": (total + limit - 1) // limit},
             "query": query
         }
@@ -176,8 +181,6 @@ async def search_transactions(
 ):
     """Search transactions by Transaction_Id in the master timeseries collection."""
     try:
-        master_collection = await get_collection()
-
         match_stage = {}
         pipeline = []
 
@@ -215,35 +218,33 @@ async def search_transactions(
         # Format results
         processed_results = [
             {
-                "id": str(doc["_id"]),
-                "transactionId": doc.get("Transaction_Id"),
-                "msgId": doc.get("Msg_id"),
-                "senderOrgId": doc.get("SenderOrgId"),
-                "receiverOrgId": doc.get("ReceiverOrgId"),
-                "amount": doc.get("amount"),
-                "operation": doc.get("Operation"),
-                "type": doc.get("Type_Of_Transaction"),
-                "result": doc.get("Result_of_Transaction"),
-                "errorCode": doc.get("ErrorCode"),
-                "errorMsg": doc.get("ErrorMsg"),
-                "timestamp": doc.get("Request_timestamp"),
-                "responseTimestamp": doc.get("Response_timestamp"),
-                "processingTime": doc.get("Time_to_Transaction_secs"),
-                "inputs": doc.get("Inputs", []),
-                "outputs": doc.get("Outputs", []),
-                "numberOfInputs": doc.get("NumberOfInputs"),
-                "numberOfOutputs": doc.get("NumberOfOutputs"),
-                "inputAmount": doc.get("input_amount"),
-                "outputAmounts": doc.get("Output_amt_list", [])
+                "Transaction_Id": doc.get("Transaction_Id"),
+                "Msg_id": doc.get("Msg_id"),
+                "SenderOrgId": doc.get("SenderOrgId"),
+                "ReceiverOrgId": doc.get("ReceiverOrgId"),
+                "Amount": doc.get("Amount"),
+                "Operation": doc.get("Operation"),
+                "Type_Of_Transaction": doc.get("Type_Of_Transaction"),
+                "Result_of_Transaction": doc.get("Result_of_Transaction"),
+                "ErrorCode": doc.get("ErrorCode"),
+                "ErrorMsg": doc.get("ErrorMsg"),
+                "Request_timestamp": doc.get("Request_timestamp"),
+                "Response_timestamp": doc.get("Response_timestamp"),
+                "Time_to_Transaction_secs": doc.get("Time_to_Transaction_secs"),
+                "Inputs": doc.get("Inputs", []),
+                "Outputs": doc.get("Outputs", []),
+                "NumberOfInputs": doc.get("NumberOfInputs"),
+                "NumberOfOutputs": doc.get("NumberOfOutputs"),
+                "Resptokens": doc.get("Resptokens", [])
             }
             for doc in results
         ]
-
         return {
-            "results": processed_results,
+            "results": {
+                "transaction": processed_results
+            },
             "pagination": {"page": page, "limit": limit, "total": total, "pages": (total + limit - 1) // limit},
             "query": query
         }
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Transaction search failed: {str(e)}")

@@ -8,18 +8,16 @@ from app.database.database import connect_to_mongo, close_mongo_connection
 from app.api.analytics import router as analytics_router
 from app.api.temporal import router as temporal_router
 from app.api.search import router as search_router
-import logging
+from app.api.duplicates import router as duplicate_router
+from app.api.custom_query import router as custom_router
 from dotenv import load_dotenv
 from app.database.database import get_collection
-from fastapi.responses import JSONResponse
-from bson import json_util
 import logging
 load_dotenv()
 
 app = FastAPI()
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,12 +46,15 @@ app.include_router(upload_router)
 app.include_router(analytics_router)
 app.include_router(temporal_router)
 app.include_router(search_router)
-import logging
+app.include_router(duplicate_router)
+app.include_router(custom_router)
 
 @app.get("/health")
 async def health_check():
     logger.info("Health check endpoint called")
     return {"status": "ok", "message": "Service is running"}
+
+logger = logging.getLogger(__name__)
 
 @app.get("/sample")
 async def read_sample():

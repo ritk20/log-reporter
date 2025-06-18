@@ -1,20 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import '../../components/charts/echartsSetup.ts'
-import ScatterChart from '../../components/charts/Scatter.tsx';
 import Histogram from '../../components/charts/Histogram.tsx';
 import DuplicateTokensTable from '../../components/cards/DuplicateTokens.tsx';
 // import TokenFlowGraph from '../../components/graphs/FlowGraph.tsx';
 
-//TODO: Replace with real data fetching logic
 import './print-analytics.css';
 
 import { useAnalytics } from '../../hooks/useAnalytics.tsx';
 import { LoadingSpinner } from '../../components/public/Loading.tsx';
 import TemporalDashboard from '../../components/charts/TimeSeries.tsx';
 import ErrorAnalysisCard from '../../components/cards/ErrorAnalysis.tsx';
-import KPICard from '../../components/public/KPIcards.tsx';
+import KPICard from '../../components/cards/KPIcards.tsx';
 import DrillDownPieChart from '../../components/charts/Pie.tsx';
+import PerformanceDashboard from '../../components/cards/PerformanceCard.tsx';
+
+// Date range state management
+  type FilterType = {
+    type: 'all' | 'single' | 'range' | 'relative';
+    startDate: string;
+    endDate: string;
+    relativePeriod: string;
+  };
 
 //TODO: add timeValue and timeUnit to the API call
 export default function AnalyticsPage() {
@@ -22,14 +29,46 @@ export default function AnalyticsPage() {
     // const [timeValue, setTimeValue] = useState<number>(24); 
     // const [timeUnit, setTimeUnit] = useState<string>('hours');
 
-    const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Date range state management
-  const [appliedFilters, setAppliedFilters] = useState({
-    type: 'all' as 'all' | 'single' | 'range' | 'relative',
-    startDate: '',
-    endDate: '',
-    relativePeriod: 'last7days'
+  const [appliedFilters, setAppliedFilters] = useState<FilterType>(() => {
+    const dateParam = searchParams.get('date') || 'all';
+    const rangeParam = searchParams.get('range');
+    const relativeParam = searchParams.get('relative');
+
+    let initialFilters: FilterType;
+    if (rangeParam) {
+      const [start, end] = rangeParam.split(':');
+      initialFilters = {
+        type: 'range',
+        startDate: start,
+        endDate: end,
+        relativePeriod: 'last7days'
+      };
+    } else if (relativeParam) {
+      initialFilters = {
+        type: 'relative',
+        startDate: '',
+        endDate: '',
+        relativePeriod: relativeParam
+      };
+    } else if (dateParam !== 'all') {
+      initialFilters = {
+        type: 'single',
+        startDate: dateParam,
+        endDate: '',
+        relativePeriod: 'last7days'
+      };
+    } else {
+      initialFilters = {
+        type: 'all',
+        startDate: '',
+        endDate: '',
+        relativePeriod: 'last7days'
+      };
+    }
+
+    return initialFilters;
   });
 
   // UI selection state (doesn't trigger data fetch)
@@ -43,16 +82,21 @@ export default function AnalyticsPage() {
   // Initialize from URL params on component mount
   useEffect(() => {
     const dateParam = searchParams.get('date') || 'all';
-    const startParam = searchParams.get('startDate');
-    const endParam = searchParams.get('endDate');
+    const rangeParam = searchParams.get('range');
     const relativeParam = searchParams.get('relative');
 
-    let initialFilters;
-    if (startParam && endParam) {
+    let initialFilters: {
+      type: 'all' | 'single' | 'range' | 'relative';
+      startDate: string;
+      endDate: string;
+      relativePeriod: string;
+    };
+    if (rangeParam) {
+      const [start, end] = rangeParam.split(':');
       initialFilters = {
         type: 'range' as const,
-        startDate: startParam,
-        endDate: endParam,
+        startDate: start,
+        endDate: end,
         relativePeriod: 'last7days'
       };
     } else if (relativeParam) {
@@ -84,42 +128,43 @@ export default function AnalyticsPage() {
 
   const calculateRelativeDates = (period: string): { startDate: string; endDate: string } => {
     const today = new Date();
-    const end = today.toISOString().split('T')[0];
+    const utcToday = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+    const end = utcToday.toISOString().split('T')[0];
     let start = new Date();
 
     switch (period) {
       case 'last24hours':
-        start.setDate(today.getDate() - 1);
+        start.setDate(utcToday.getDate() - 1);
         break;
       case 'last7days':
-        start.setDate(today.getDate() - 7);
+        start.setDate(utcToday.getDate() - 7);
         break;
       case 'last30days':
-        start.setDate(today.getDate() - 30);
+        start.setDate(utcToday.getDate() - 30);
         break;
       case 'last90days':
-        start.setDate(today.getDate() - 90);
+        start.setDate(utcToday.getDate() - 90);
         break;
       case 'thisweek':
-        start.setDate(today.getDate() - today.getDay());
+        start.setDate(utcToday.getDate() - utcToday.getDay());
         break;
       case 'lastweek':
-        start.setDate(today.getDate() - today.getDay() - 7);
+        start.setDate(utcToday.getDate() - utcToday.getDay() - 7);
         return {
           startDate: start.toISOString().split('T')[0],
-          endDate: new Date(today.setDate(today.getDate() - today.getDay() - 1)).toISOString().split('T')[0]
+          endDate: new Date(utcToday.setDate(utcToday.getDate() - utcToday.getDay() - 1)).toISOString().split('T')[0]
         };
       case 'thismonth':
-        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        start = new Date(utcToday.getFullYear(), utcToday.getMonth(), 1);
         break;
       case 'lastmonth':
-        start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        start = new Date(utcToday.getFullYear(), utcToday.getMonth() - 1, 1);
         return {
           startDate: start.toISOString().split('T')[0],
-          endDate: new Date(today.getFullYear(), today.getMonth(), 0).toISOString().split('T')[0]
+          endDate: new Date(utcToday.getFullYear(), utcToday.getMonth(), 0).toISOString().split('T')[0]
         };
       default:
-        start.setDate(today.getDate() - 7);
+        start.setDate(utcToday.getDate() - 7);
     }
     
     return {
@@ -127,6 +172,7 @@ export default function AnalyticsPage() {
       endDate: end
     };
   };
+
   // Convert applied filters to API query parameters
   const getQueryParams = () => {
     switch (appliedFilters.type) {
@@ -172,8 +218,7 @@ export default function AnalyticsPage() {
     switch (selectedFilters.type) {
       case 'range':
         if (selectedFilters.startDate && selectedFilters.endDate) {
-          params.set('startDate', selectedFilters.startDate);
-          params.set('endDate', selectedFilters.endDate);
+          params.set('range', `${selectedFilters.startDate}:${selectedFilters.endDate}`);
         }
         break;
       case 'single':
@@ -182,8 +227,10 @@ export default function AnalyticsPage() {
         }
         break;
       case 'relative':
-        params.set('relative', selectedFilters.relativePeriod);
-        break;
+        { params.set('relative', selectedFilters.relativePeriod);
+        const { startDate, endDate } = calculateRelativeDates(selectedFilters.relativePeriod);
+        params.set('range', `${startDate}:${endDate}`);
+        break; }
       default:
         params.set('date', 'all');
     }
@@ -203,19 +250,19 @@ export default function AnalyticsPage() {
     setSearchParams({ date: 'all' });
   };
 
-    if (isLoading) {
-      return <LoadingSpinner/>
-    }
+  if (isLoading) {
+    return <LoadingSpinner/>
+  }
 
-    if (error) {
-      return <div className="text-red-500 text-center p-4">Error: {error}</div>;
-    }
+  if (error) {
+    return <div className="text-red-500 text-center p-4">Error: {error}</div>;
+  }
 
-    if (!data) {
-      return <div className="text-center p-4">No data available</div>;
-    }
+  if (!data) {
+    return <div className="text-center p-4">No data available</div>;
+  }
 
-    const handleDownloadPDF = () => {
+  const handleDownloadPDF = () => {
     // Hide the download button before printing
     const downloadBtn = document.getElementById('download-pdf-btn');
     if (downloadBtn) {
@@ -501,42 +548,28 @@ export default function AnalyticsPage() {
           {/* Statistical KPI Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <KPICard
-              title="Transaction Amounts"
-              mean={data.averageTransactionAmount}
-              stdev={data.stdevTransactionAmount}
-              min={data.minTransactionAmount}
-              max={data.maxTransactionAmount}
-              percentile25={data.percentile25TransactionAmount}
-              percentile50={data.percentile50TransactionAmount}
-              percentile75={data.percentile75TransactionAmount}
+              title="OFFUS Transaction Amount"
+              mean={data.averageOFFUSTransactionAmount}
+              min={data.minOFFUSTransactionAmount}
+              max={data.maxOFFUSTransactionAmount}
               unit=" Rs" //hardcoded to Rs
               colorScheme="blue"
             />
-            
+            <KPICard
+              title="ONUS Transaction Amount"
+              mean={data.averageONUSTransactionAmount}
+              min={data.minONUSTransactionAmount}
+              max={data.maxONUSTransactionAmount}
+              unit=" Rs" //hardcoded to Rs
+              colorScheme="purple"
+            />
             <KPICard
               title="Processing Time"
               mean={data.averageProcessingTime}
-              stdev={data.stdevProcessingTime}
               min={data.minProcessingTime}
               max={data.maxProcessingTime}
-              percentile25={data.percentile25ProcessingTime}
-              percentile50={data.percentile50ProcessingTime}
-              percentile75={data.percentile75ProcessingTime}
               unit="s"
               colorScheme="green"
-            />
-            
-            <KPICard
-              title="Error Rate"
-              mean={data.averageProcessingTime}
-              stdev={data.stdevProcessingTime}
-              min={data.minProcessingTime}
-              max={data.maxProcessingTime}
-              percentile25={data.percentile25ProcessingTime}
-              percentile50={data.percentile50ProcessingTime}
-              percentile75={data.percentile75ProcessingTime}
-              unit="%"
-              colorScheme="red"
             />
           </div>
         </div>
@@ -593,16 +626,16 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Performance Scatter</h3>
+            <h2 className="text-lg font-semibold text-gray-900">Performance Analysis</h2>
           </div>
-          <div className="p-6">
-            <div className="h-64">
-              <ScatterChart title='Processing Time vs Input Tokens' data={data.processingTimeByInputs} />
-            </div>
-          </div>
+          <PerformanceDashboard
+            dateFilter={appliedFilters.type === 'all' ? 'all' : 
+                      appliedFilters.type === 'range' ? `${appliedFilters.startDate}:${appliedFilters.endDate}` :
+                      appliedFilters.type === 'relative' ? `${calculateRelativeDates(appliedFilters.relativePeriod).startDate}:${calculateRelativeDates(appliedFilters.relativePeriod).endDate}` :
+                      appliedFilters.startDate} 
+          />
         </div>
 
         {/* Bottom Section - Data Tables */}
@@ -617,12 +650,16 @@ export default function AnalyticsPage() {
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
             <TemporalDashboard
-              aggregatedData={data.temporal ?? data.transactionStatsByhourInterval.map(e => ({
-                ...e,
-                byType: e.byType || {},
-                byOp: e.byOp || {},
-                byErr: e.byErr || {}
-              }))}
+              aggregatedData={
+                data.temporal
+                  ?? data.transactionStatsByhourInterval?.map(e => ({
+                    ...e,
+                    byType: e.byType || {},
+                    byOp: e.byOp || {},
+                    byErr: e.byErr || {}
+                  }))
+                  ?? []
+              }
               isHourlyData={!data.temporal}
             />
         </div>

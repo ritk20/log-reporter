@@ -22,36 +22,16 @@
   },
   "total": 100,
   "successRate": 90.00,
+  "sumAmount": 1500000,
   "averageProcessingTime": 856.32,
-  "stdevProcessingTime": 123,
   "minProcessingTime": 214,
   "maxProcessingTime": 13,
-  "percentile25ProcessingTime": 21,
-  "percentile50ProcessingTime": 342,
-  "percentile75ProcessingTime": 53,
-  "averageTransactionAmount": 2314,
-  "stdevTransactionAmount": 3412,
-  "minTransactionAmount": 243,
-  "maxTransactionAmount": 2445,
-  "percentile25TransactionAmount": 3254,
-  "percentile50TransactionAmount": 324,
-  "percentile75TransactionAmount": 34,
-  "lastXTransactions": [
-    {
-      "Transaction_Id": "tx-a7b3c9d2e5",
-      "Msg_id": "msg-f8g6h4j2k1",
-      "type": "TRANSFER",
-      "operation": "SPLIT",
-      "error": "Success",
-      "result": "success",
-      "request_time": "2025-05-30T10:15:30.123Z",
-      "response_time": "2025-05-30T10:15:31.234Z",
-      "amount": 5000.50,
-      "processingTime": 1111.11,
-      "number_of_inputs": 2,
-      "number_of_outputs": 3
-    }
-  ],
+  "averageONUSTransactionAmount": 2314,
+  "minONUSTransactionAmount": 243,
+  "maxONUSTransactionAmount": 2445,
+  "averageOFFUSTransactionAmount": 2314,
+  "minOFFUSTransactionAmount": 243,
+  "maxOFFUSTransactionAmount": 2445,
   "crossTypeOp": {
     "LOAD": {
       "SPLIT": 150,
@@ -67,6 +47,23 @@
       "SPLIT": 90,
       "MERGE": 100,
       "ISSUE": 30
+    }
+  },
+  "crossOpType": {
+    "SPLIT": {
+      "LOAD": 150,
+      "TRANSFER": 120,
+      "REDEEM": 80
+    },
+    "MERGE": {
+      "LOAD": 180,
+      "TRANSFER": 100,
+      "REDEEM": 1
+    },
+    "ISSUE": {
+      "LOAD": 100,
+      "TRANSFER": 120,
+      "REDEEM": 60
     }
   },
   "crossTypeError": {
@@ -109,25 +106,6 @@
       "AS404": 5
     }
   },
-  "amountDistribution": [
-    { "x": 0, "y": 1000.50, "type": "LOAD" },
-    { "x": 1, "y": 2500.75, "type": "TRANSFER" },
-    { "x": 2, "y": 1750.25, "type": "REDEEM" }
-  ],
-  "processingTimeByInputs": [
-    { "x": 1, "y": 500.25 },
-    { "x": 2, "y": 750.50 },
-    { "x": 3, "y": 1000.75 },
-    { "x": 4, "y": 1250.25 },
-    { "x": 5, "y": 1500.50 }
-  ],
-  "processingTimeByOutputs": [
-    { "x": 1, "y": 550.25 },
-    { "x": 2, "y": 800.50 },
-    { "x": 3, "y": 1050.75 },
-    { "x": 4, "y": 1300.25 },
-    { "x": 5, "y": 1550.50 }
-  ],
   "mergedTransactionAmountIntervals": [
     {
       "interval": "0-100",

@@ -1,27 +1,16 @@
-// KPIcards.tsx
-import { useState } from 'react';
-
 interface KPICardProps {
   title: string;
   mean: number;
-  stdev: number;
   min: number;
   max: number;
-  percentile25: number;
-  percentile50: number;
-  percentile75: number;
   unit?: string;
   colorScheme?: 'blue' | 'green' | 'purple' | 'orange' | 'red';
 }
 
 const tooltipTexts: Record<string, string> = {
   mean: "Mean (average): The sum of all values divided by the number of values, giving the central value of the data set.",
-  stdev: "Standard Deviation: A measure of how spread out the numbers are around the mean. A low stdev means data points are close to the mean.",
   min: "Minimum: The smallest value in the data set.",
   max: "Maximum: The largest value in the data set.",
-  percentile25: "25th Percentile (Q1): The value below which 25% of the data falls. Also known as the first quartile.",
-  percentile50: "50th Percentile (Median): The middle value of the data set when sorted. Half the data is below, half above.",
-  percentile75: "75th Percentile (Q3): The value below which 75% of the data falls. Also known as the third quartile.",
 };
 
 const colorSchemes = {
@@ -65,17 +54,11 @@ const colorSchemes = {
 export default function KPICard({
   title,
   mean,
-  stdev,
   min,
   max,
-  percentile25,
-  percentile50,
-  percentile75,
   unit = '',
   colorScheme = 'blue'
 }: KPICardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
   const colors = colorSchemes[colorScheme];
 
@@ -89,16 +72,7 @@ export default function KPICard({
   };
 
   const primaryMetrics = [
-    { key: "mean", label: "Mean", value: mean, isPrimary: true },
-    { key: "percentile50", label: "Median", value: percentile50, isPrimary: true },
-  ];
-
-  const detailedMetrics = [
-    { key: "stdev", label: "Std Dev", value: stdev },
-    { key: "min", label: "Min", value: min },
-    { key: "max", label: "Max", value: max },
-    { key: "percentile25", label: "Q1 (25%)", value: percentile25 },
-    { key: "percentile75", label: "Q3 (75%)", value: percentile75 },
+    { key: "mean", label: "Mean", value: mean, isPrimary: true }
   ];
 
   return (
@@ -117,19 +91,6 @@ export default function KPICard({
               <p className="text-sm text-gray-500">Statistical Overview</p>
             </div>
           </div>
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <svg 
-              className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
         </div>
       </div>
 
@@ -164,35 +125,6 @@ export default function KPICard({
           </div>
         </div>
       </div>
-
-      {/* Detailed Metrics - Expandable */}
-      {isExpanded && (
-        <div className="px-6 pb-6 border-t border-gray-100">
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
-            {detailedMetrics.map((metric) => (
-              <div 
-                key={metric.key} 
-                className="relative group bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors cursor-help"
-                onMouseEnter={() => setActiveTooltip(metric.key)}
-                onMouseLeave={() => setActiveTooltip(null)}
-              >
-                <p className="text-lg font-semibold text-gray-900">
-                  {formatValue(metric.value)}{unit}
-                </p>
-                <p className="text-sm text-gray-600">{metric.label}</p>
-                
-                {/* Interactive Tooltip */}
-                {activeTooltip === metric.key && (
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg z-20 w-64">
-                    {tooltipTexts[metric.key]}
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
