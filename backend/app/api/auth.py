@@ -94,7 +94,7 @@ async def refresh_token(request: Request):
             data={"sub": payload["username"], "role": payload["roles"][0]},
             expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         )
-        new_refresh_token, _ = create_refresh_token(
+        new_refresh_token = create_refresh_token(
             data={"sub": payload["username"], "role": payload["roles"][0]}
         )
         
