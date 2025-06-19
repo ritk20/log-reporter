@@ -8,6 +8,23 @@ from datetime import datetime
 from app.api.auth_jwt import verify_token 
 from dateutil.relativedelta import relativedelta
 
+import numpy as np
+from typing import Any
+import json
+from bson import json_util
+
+def convert_numpy_types(obj: Any) -> Any:
+    if isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    return obj
+
+def parse_json(data: Any) -> Any:
+    data = convert_numpy_types(data)
+    return json.loads(json_util.dumps(data))
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 client = MongoClient(settings.MONGODB_URL)
@@ -95,11 +112,12 @@ async def get_analytics(
             {"date": date},
             {"_id": 0, "summary": 1}
         )
+        logging.info(f"Fetched analytics for date: {date}, Document: {doc}")
         if doc and "summary" in doc:
             doc = doc["summary"]
         if not doc:
             raise HTTPException(status_code=404, detail=f"No data found for {date}")
-        return doc
+        return parse_json(doc)
 
     except Exception as e:
         logging.error(f"Error in get_analytics: {str(e)}", exc_info=True)

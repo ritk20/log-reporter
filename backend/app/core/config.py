@@ -27,13 +27,13 @@ class Settings:
 
     # MongoDB settings
     MONGODB_URL: str = os.getenv("MONGODB_URL")
-    MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "logs2")
-    MONGODB_COLLECTION_NAME: str = os.getenv("MONGODB_COLLECTION_NAME", "master2")
+    MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "logs")
+    MONGODB_COLLECTION_NAME: str = os.getenv("MONGODB_COLLECTION_NAME", "master")
     MONGODB_DAILY_SUMM_COLLECTION_NAME: str = os.getenv("MONGODB_DAILY_SUMM_COLLECTION_NAME","Daily_Transaction_Summary2")
     MONGODB_SUMM_COLLECTION_NAME: str = os.getenv("MONGODB_SUMM_COLLECTION_NAME","Transaction_summary2")
-    MONGODB_TOKENS_COLLECTION_NAME: str = os.getenv("MONGODB_TOKENS_COLLECTION_NAME", "tokens2")
-    MONGODB_TEMP_TOKENS_COLLECTION_NAME: str = os.getenv("MONGODB_TEMP_TOKENS_COLLECTION_NAME", "tempTokens2")
-    MONGODB_TEMP_COLLECTION_NAME: str = os.getenv("MONGODB_TEMP_COLLECTION_NAME","Temp2")
+    MONGODB_TOKENS_COLLECTION_NAME: str = os.getenv("MONGODB_TOKENS_COLLECTION_NAME", "tokens")
+    MONGODB_TEMP_TOKENS_COLLECTION_NAME: str = os.getenv("MONGODB_TEMP_TOKENS_COLLECTION_NAME", "tempTokens")
+    MONGODB_TEMP_COLLECTION_NAME: str = os.getenv("MONGODB_TEMP_COLLECTION_NAME","Temp")
 
 
     class Config:

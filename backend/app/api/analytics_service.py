@@ -1,4 +1,5 @@
 # app/api/analytics_service.py
+import logging
 from fastapi import HTTPException
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
@@ -30,7 +31,7 @@ def get_error_docs_excluding_noerror(collection: Collection):
     # Retrieve documents for all error codes except "noerror"
     pipeline = [
         {
-            "$match": {"ErrorCode": {"$ne": "noerror"}}  # Exclude "noerror"
+            "$match": {"ErrorCode": {"$ne": "No error"}}  # Exclude "noerror"
         }
     ]
     # Perform the aggregation to fetch documents
@@ -88,7 +89,6 @@ def get_amount_buckets(collection: Collection, n_intervals=10):
 
     total_transactions = 0
     total_success = 0
-    total_processing_time = 0
 
     for doc in cursor:
         amt = doc.get("input_amount", 0)
@@ -100,12 +100,12 @@ def get_amount_buckets(collection: Collection, n_intervals=10):
             res = "SUCCESS" if float(res_val) == 1 else "FAILURE"
         else:
             res = "UNKNOWN"
-        ttime = doc.get("Time_to_Transaction_secs", 0)
+        
 
         total_transactions += 1
         if res == "SUCCESS":
             total_success += 1
-        total_processing_time += ttime
+        
 
         # Find the appropriate bucket based on the amount
         for bucket in buckets:
@@ -127,9 +127,8 @@ def get_amount_buckets(collection: Collection, n_intervals=10):
         })
 
     success_rate = total_success / total_transactions if total_transactions else 0
-    avg_processing_time = total_processing_time / total_transactions if total_transactions else 0
 
-    return bucket_docs, total_transactions, success_rate, avg_processing_time
+    return bucket_docs, total_transactions, success_rate
 
 
 
@@ -191,7 +190,7 @@ def get_hour_interval_stats(collection: Collection):
     interval_duration = timedelta(hours=1)  # 1 hour intervals
 
     cursor = collection.find({}, projection=[
-        "Request_timestamp", "Result_of_Transaction", "input_amount", "Time_to_Transaction_secs", "ErrorCode",  "Type_Of_Transaction"
+        "Request_timestamp", "Result_of_Transaction", "input_amount", "Time_to_Transaction_secs", "ErrorCode",  "Type_Of_Transaction","Operation", "SenderOrgId", "ReceiverOrgId"
     ])
 
     buckets = {}
@@ -204,12 +203,28 @@ def get_hour_interval_stats(collection: Collection):
         if bucket_start not in buckets:
             buckets[bucket_start] = {
                 "transaction_count": 0,
+                "onuscount": 0,
+                "offuscount": 0,
+                "onusamountcount":0,
+                "offusamountcount": 0,
                 "error_count": 0,
                 "total_amount": 0,
                 "total_time": 0,
-                "byType": {"LOAD": 0, "TRANSFER": 0, "REDEEM": 0}  # Initialize the byType dictionary
+                "byType": {"LOAD": 0, "TRANSFER": 0, "REDEEM": 0},  # Initialize the byType dictionary
+            
+                "byOp": {"MERGE": 0, "ISSUE": 0, "SPLIT": 0}  # Initialize the byOp dictionary
             }
         buckets[bucket_start]["transaction_count"] += 1
+        if doc["ReceiverOrgId"]==doc["SenderOrgId"]:
+            buckets[bucket_start]["onuscount"] +=1
+            buckets[bucket_start]["onusamountcount"] +=doc["input_amount"]
+        else:
+            buckets[bucket_start]["offuscount"] +=1
+            buckets[bucket_start]["offusamountcount"] +=doc["input_amount"]
+
+
+
+
         err_code = doc["ErrorCode"]
         if err_code.lower() != "no error":
             buckets[bucket_start]["error_count"] += 1
@@ -219,6 +234,9 @@ def get_hour_interval_stats(collection: Collection):
         typ = doc.get("Type_Of_Transaction", "UNKNOWN").upper()  # Ensure we handle case insensitivity
         if typ in buckets[bucket_start]["byType"]:
             buckets[bucket_start]["byType"][typ] += 1
+        op = doc.get("Operation", "UNKNOWN").upper()  # Ensure we handle case insensitivity
+        if op in buckets[bucket_start]["byOp"]:
+            buckets[bucket_start]["byOp"][op] += 1
 
     interval_stats = []
     for start_time in sorted(buckets.keys()):
@@ -232,21 +250,41 @@ def get_hour_interval_stats(collection: Collection):
             "interval_start": start_time.isoformat(),
             "interval_end": end_time.isoformat(),
             "count": stats["transaction_count"],
-            # "error_count": stats["error_count"],
+            "onuscount": stats["onuscount"],
+            "offuscount": stats["offuscount"],
+            "onusamountcount":stats["onusamountcount"],
+            "offusamountcount": stats["offusamountcount"],
+            "error_count": stats["error_count"],
             "sum_amount": stats["total_amount"],
             "average_processing_time": avg_processing_time,  # Add average processing time here
-            "byType": stats["byType"]
+            "byType": stats["byType"],
+            "byOp": stats["byOp"]
         })
     return interval_stats
+import numpy as np
+
+def r2(val):
+    return round(float(val), 2)
+
+
+def compute_stats(values, prefix):
+    return {
+        f"{prefix}average": r2(np.mean(values)),
+        f"{prefix}min": r2(np.min(values)),
+        f"{prefix}max": r2(np.max(values)),
+    }
+
+
 
 def calculate_transaction_statistics(collection):
-    import numpy as np
-
     pipeline = [
+
         {
             "$project": {
                 "processingTime": "$Time_to_Transaction_secs",
-                "transactionAmount": "$Req_Tot_Amount"
+                "transactionAmount": "$Req_Tot_Amount",
+                "senderid": "$SenderOrgId",
+                "reciverid": "$ReceiverOrgId"
             }
         }
     ]
@@ -255,56 +293,42 @@ def calculate_transaction_statistics(collection):
 
     processing_times = []
     transaction_amounts = []
-
+    OnUs, OffUs = [], []
     for doc in cursor:
-        if doc.get("processingTime") is not None:
-            processing_times.append(doc["processingTime"])
-        if doc.get("transactionAmount") is not None:
-            transaction_amounts.append(doc["transactionAmount"])
+        processing_time = doc.get("processingTime")
+        amount = doc.get("transactionAmount")
+        sender = doc.get("senderid")
+        receiver = doc.get("reciverid")
+
+        if processing_time is not None:
+            processing_times.append(processing_time)
+        if amount is not None:
+            transaction_amounts.append(amount)
+            if sender is not None and receiver is not None:
+                if sender == receiver:
+                    OnUs.append(amount)
+                else:
+                    OffUs.append(amount)
+
 
     stats = {}
 
-    # Helper to round to 2 decimal places
-    def r2(val):
-        return round(float(val), 2)
+    stats.update(compute_stats(processing_times, "processingTime_")) if processing_times else \
+        stats.update({k: 0 for k in compute_stats([0], "processingTime_").keys()})
 
-    # Processing time statistics
-    if processing_times:
-        stats["averageProcessingTime"] = r2(np.mean(processing_times))
-        stats["stdevProcessingTime"] = r2(np.std(processing_times, ddof=1)) if len(processing_times) > 1 else 0
-        stats["minProcessingTime"] = r2(np.min(processing_times))
-        stats["maxProcessingTime"] = r2(np.max(processing_times))
-        stats["percentile25ProcessingTime"] = r2(np.percentile(processing_times, 25))
-        stats["percentile50ProcessingTime"] = r2(np.percentile(processing_times, 50))
-        stats["percentile75ProcessingTime"] = r2(np.percentile(processing_times, 75))
-    else:
-        stats["averageProcessingTime"] = 0
-        stats["stdevProcessingTime"] = 0
-        stats["minProcessingTime"] = 0
-        stats["maxProcessingTime"] = 0
-        stats["percentile25ProcessingTime"] = 0
-        stats["percentile50ProcessingTime"] = 0
-        stats["percentile75ProcessingTime"] = 0
+    stats.update(compute_stats(transaction_amounts, "transactionAmount_")) if transaction_amounts else \
+        stats.update({k: 0 for k in compute_stats([0], "transactionAmount_").keys()})
 
-    # Transaction amount statistics
-    if transaction_amounts:
-        stats["averageTransactionAmount"] = r2(np.mean(transaction_amounts))
-        stats["stdevTransactionAmount"] = r2(np.std(transaction_amounts, ddof=1)) if len(transaction_amounts) > 1 else 0
-        stats["minTransactionAmount"] = r2(np.min(transaction_amounts))
-        stats["maxTransactionAmount"] = r2(np.max(transaction_amounts))
-        stats["percentile25TransactionAmount"] = r2(np.percentile(transaction_amounts, 25))
-        stats["percentile50TransactionAmount"] = r2(np.percentile(transaction_amounts, 50))
-        stats["percentile75TransactionAmount"] = r2(np.percentile(transaction_amounts, 75))
-    else:
-        stats["averageTransactionAmount"] = 0
-        stats["stdevTransactionAmount"] = 0
-        stats["minTransactionAmount"] = 0
-        stats["maxTransactionAmount"] = 0
-        stats["percentile25TransactionAmount"] = 0
-        stats["percentile50TransactionAmount"] = 0
-        stats["percentile75TransactionAmount"] = 0
+    stats.update(compute_stats(OnUs, "transactionAmount_ONUS_")) if OnUs else \
+        stats.update({k: 0 for k in compute_stats([0], "transactionAmount_ONUS_").keys()})
 
+    stats.update(compute_stats(OffUs, "transactionAmount_OFFUS_")) if OffUs else \
+        stats.update({k: 0 for k in compute_stats([0], "transactionAmount_OFFUS_").keys()})
+
+    stats["totalAmount_ONUS"] = r2(sum(OnUs))
+    stats["totalAmount_OFFUS"] = r2(sum(OffUs))
     return stats
+
 def aggregate_daily_summary(collection, daily_collection):
     type_counts = get_type_counts(collection)
     sum_amount=get_sum_amounts(collection)
@@ -312,7 +336,7 @@ def aggregate_daily_summary(collection, daily_collection):
     error_counts = get_error_counts(collection)
     error_docs = get_error_docs_excluding_noerror(collection)
     result_counts = get_result_counts(collection)
-    bucket_docs, total_transactions, success_rate, avg_processing_time = get_amount_buckets(collection)
+    bucket_docs, total_transactions, success_rate = get_amount_buckets(collection)
     cross_type_op = get_cross_type_operation(collection)
     cross_op_type = get_cross_operation_type(collection)
     cross_type_error = get_cross_type_error(collection)
@@ -359,7 +383,6 @@ def aggregate_daily_summary(collection, daily_collection):
             "mergedTransactionAmountIntervals": bucket_docs,
             "total": total_transactions,
             "successRate": success_rate * 100,
-            "averageProcessingTime": avg_processing_time,
             "crossTypeOp": cross_type_op,
             "crossOpType": cross_op_type,
             "crossTypeError": cross_type_error,
@@ -368,24 +391,19 @@ def aggregate_daily_summary(collection, daily_collection):
             "processingTimeByOutputs": processing_time_by_outputs,
             "transactionStatsByhourInterval": interval_stats,
             "duplicateTokens": duplicate_tokens,
-
-
-
-
-
-
             **transaction_stats
         }
     }
 
     date_key = start_time_iso[:10]
     daily_collection.update_one({"date": date_key}, {"$set": summary_doc}, upsert=True)
+    logging.info(f"Daily summary updated for {date_key}")
     return date_key
 
 
 
 
-
+# ---------------------------------------------------------------------------------------
 
 def get_temporal(daily_collection: Collection, start_date: str, end_date: str):
     # Initialize a defaultdict to store aggregated temporal data for each date
@@ -442,7 +460,83 @@ def get_temporal(daily_collection: Collection, start_date: str, end_date: str):
 
     return aggregated_temporal
 
+def compute_aggregates(values, prefix):
+    return {
+        f"{prefix}average": r2(np.mean(values)),
+        f"{prefix}min": r2(np.min(values)),
+        f"{prefix}max": r2(np.max(values)),
+    }
+from collections import defaultdict
 
+def calculate_aggregate_statistics(daily_collection: Collection, start_date: str, end_date: str):
+    aggregate_statistics = {
+        "averageProcessingTime": 0.0,
+        "minProcessingTime": float('inf'),  # Initialize to inf for min values
+        "maxProcessingTime": -float('inf'),  # Initialize to -inf for max values
+        "averageONUSTransactionAmount": 0.0,
+        "minONUSTransactionAmount": float('inf'),  # Initialize to inf for min values
+        "maxONUSTransactionAmount": -float('inf'),  # Initialize to -inf for max values
+        "averageOFFUSTransactionAmount": 0.0,
+        "minOFFUSTransactionAmount": float('inf'),  # Initialize to inf for min values
+        "maxOFFUSTransactionAmount": -float('inf'),  # Initialize to -inf for max values
+    }
+    
+    counttotal = 0
+    processing_time = 0
+    onusamt = 0
+    offusamt = 0
+
+    # Query to filter documents between the two dates
+    cursor = daily_collection.find({
+        "date": {"$gte": start_date, "$lte": end_date}  # Filter by date (YYYY-MM-DD format)
+    })
+    
+    for doc in cursor:
+        summary = doc.get("summary", {})
+        count = summary.get("total", 0)  # Total number of transactions in a single doc
+        averageProcessingTime = summary.get("processingTime_average", 0.0)
+        minProcessingTime = summary.get("processingTime_min", 0.0)
+        maxProcessingTime = summary.get("processingTime_max", 0.0)
+        averageONUSTransactionAmount = summary.get("transactionAmount_ONUS_average", 0.0)
+        minONUSTransactionAmount = summary.get("transactionAmount_ONUS_min", 0.0)
+        maxONUSTransactionAmount = summary.get("transactionAmount_ONUS_max", 0.0)
+        averageOFFUSTransactionAmount = summary.get("transactionAmount_OFFUS_average", 0.0)
+        minOFFUSTransactionAmount = summary.get("transactionAmount_OFFUS_min", 0.0)
+        maxOFFUSTransactionAmount = summary.get("transactionAmount_OFFUS_max", 0.0)
+
+        # Aggregate the values
+        counttotal += count
+        processing_time += averageProcessingTime * count
+        onusamt += averageONUSTransactionAmount * count
+        offusamt += averageOFFUSTransactionAmount * count
+        
+        # Update min and max values
+        aggregate_statistics["minProcessingTime"] = min(aggregate_statistics["minProcessingTime"], minProcessingTime)
+        aggregate_statistics["minONUSTransactionAmount"] = min(aggregate_statistics["minONUSTransactionAmount"], minONUSTransactionAmount)
+        aggregate_statistics["minOFFUSTransactionAmount"] = min(aggregate_statistics["minOFFUSTransactionAmount"], minOFFUSTransactionAmount)
+        aggregate_statistics["maxProcessingTime"] = max(aggregate_statistics["maxProcessingTime"], maxProcessingTime)
+        aggregate_statistics["maxONUSTransactionAmount"] = max(aggregate_statistics["maxONUSTransactionAmount"], maxONUSTransactionAmount)
+        aggregate_statistics["maxOFFUSTransactionAmount"] = max(aggregate_statistics["maxOFFUSTransactionAmount"], maxOFFUSTransactionAmount)
+
+    # Update average values after processing all documents
+    if counttotal > 0:
+        aggregate_statistics["averageProcessingTime"] = processing_time / counttotal
+        aggregate_statistics["averageONUSTransactionAmount"] = onusamt / counttotal
+        aggregate_statistics["averageOFFUSTransactionAmount"] = offusamt / counttotal
+
+    return aggregate_statistics
+
+
+
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------------
 def aggregate_summary_by_date_range(daily_collection: Collection, start_date: str, end_date: str):    
     # Ensure date strings are in YYYY-MM-DD format
     start_date = start_date.strftime('%Y-%m-%d')  # Convert to string with format YYYY-MM-DD
@@ -461,12 +555,6 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
     total_transactions = 0
     total_success = 0
     total_processing_time = 0
-    merged_transaction_amount_intervals = defaultdict(lambda: {
-    "total": 0,
-    "load": 0,
-    "transfer": 0,
-    "redeem": 0
-})
     cross_type_op = defaultdict(lambda: defaultdict(int))
     cross_op_type = defaultdict(lambda: defaultdict(int))
     cross_type_error = defaultdict(lambda: defaultdict(int))
@@ -474,6 +562,13 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
     processing_time_by_inputs = defaultdict(list)
     processing_time_by_outputs = defaultdict(list)
     merged_tokens = {}
+    merged_transaction_amount_intervals = defaultdict(lambda: {
+    "total": 0,
+    "load": 0,
+    "transfer": 0,
+    "redeem": 0
+    })
+    
     # transaction_stats = {}  # Additional transaction stats can be added here
 
     # Loop through each document in the date range
@@ -510,8 +605,6 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
                 merged_transaction_amount_intervals[interval]["load"] += x.get("load", 0)
                 merged_transaction_amount_intervals[interval]["transfer"] += x.get("transfer", 0)
                 merged_transaction_amount_intervals[interval]["redeem"] += x.get("redeem", 0)
-            
-
         # Aggregate cross-type operation counts
         for t, op_dict in summary.get("crossTypeOp", {}).items():
             for op, count in op_dict.items():
@@ -576,11 +669,22 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
                 }
     merged_token_list = list(merged_tokens.values())
     temporal = get_temporal(daily_collection, start_date, end_date)
+    aggregate_transaction_stats=calculate_aggregate_statistics(daily_collection, start_date, end_date)
+    merged_transaction_amounts_intervals = [{"index": key, **value} for key, value in merged_transaction_amount_intervals.items()]
+
+
+
+
+
+
+
+
+
+
             
     # Calculate overall success rate and average processing time
     success_rate = (total_success / total_transactions) * 100 if total_transactions else 0
-    avg_processing_time = total_processing_time / total_transactions if total_transactions else 0
-
+    
     # Generate the summary document
     summary_doc = {
         "start_time": start_date,
@@ -590,10 +694,9 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
         "error": dict(error_counts),
         "errorDocs": error_docs,
         "result": dict(result_counts),
-        "mergedTransactionAmountIntervals": merged_transaction_amount_intervals, 
+        "mergedTransactionAmountIntervals": merged_transaction_amounts_intervals, 
         "total": total_transactions,
         "successRate": success_rate,
-        "averageProcessingTime": avg_processing_time,
         "crossTypeOp": cross_type_op,
         "crossOpType": cross_op_type,
         "crossTypeError": cross_type_error,
@@ -602,71 +705,303 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
         "processingTimeByOutputs": processing_time_by_outputs,
         "duplicateTokens": merged_token_list,
         "temporal": temporal,
-        # **transaction_stats
+        **aggregate_transaction_stats
     
     }
 
     return summary_doc
 
-# def aggregate_overall_summary(date_str: str, daily_collection, overall_collection):
-#     daily_doc = daily_collection.find_one({"date": date_str})
-#     if not daily_doc:
-#         raise HTTPException(status_code=404, detail=f"No daily summary found for {date_str}")
-
-#     daily_summary = daily_doc.get("summary", {})
+def aggregate_daily_summary(collection: Collection, daily_collection: Collection):
     
-#     # Initialize overall_doc with default values
-#     overall_doc = overall_collection.find_one({"_id": "overall_summary"}) or {
-#         "type": {},
-#         "operation": {},
-#         "error": {},
-#         "result": {},
-#         "count_days": 0,
-#         "successRate": 0.0,
-#         "averageProcessingTime": 0.0
-#     }
+    type_counts = get_type_counts(collection)
+    operation_counts = get_operation_counts(collection)
+    error_counts = get_error_counts(collection)
+    result_counts = get_result_counts(collection)
+    bucket_docs, total_transactions, success_rate, avg_processing_time = get_amount_buckets(collection)
+    cross_type_op = get_cross_type_operation(collection)
+    cross_type_error = get_cross_type_error(collection)
+    cross_op_error = get_cross_operation_error(collection)
+    processing_time_by_inputs = get_processing_time_by_inputs(collection)
+    processing_time_by_outputs = get_processing_time_by_outputs(collection)
+    interval_stats = get_hour_interval_stats(collection)
+    
+    # Get min and max Request_timestamp directly (assumed always valid ISO datetime or datetime obj)
+    minmax_time_result = list(collection.aggregate([
+        {
+            "$group": {
+                "_id": None,
+                "minTime": {"$min": "$Request_timestamp"},
+                "maxTime": {"$max": "$Request_timestamp"},
+            }
+        }
+    ]))
+    min_time_val = minmax_time_result[0]["minTime"]
+    max_time_val = minmax_time_result[0]["maxTime"]
+    start_time_iso = min_time_val.isoformat() if hasattr(min_time_val, "isoformat") else min_time_val
+    end_time_iso = max_time_val.isoformat() if hasattr(max_time_val, "isoformat") else max_time_val
 
-#     # Update counters
-#     overall_type = Counter(overall_doc.get("type", {}))
-#     overall_operation = Counter(overall_doc.get("operation", {}))
-#     overall_error = Counter(overall_doc.get("error", {}))
-#     overall_result = Counter(overall_doc.get("result", {}))
+    summary_doc = {
+        "start_time": start_time_iso,
+        "end_time": end_time_iso,
+        "summary": {
+            "type": dict(type_counts),
+            "operation": dict(operation_counts),
+            "error": dict(error_counts),
+            "result": dict(result_counts),
+            "mergedTransactionAmountIntervals": bucket_docs,
+            "total": total_transactions,
+            "successRate": success_rate,
+            "averageProcessingTime": avg_processing_time,
+            "crossTypeOp": cross_type_op,
+            "crossTypeError": cross_type_error,
+            "crossOpError": cross_op_error,
+            "processingTimeByInputs": processing_time_by_inputs,
+            "processingTimeByOutputs": processing_time_by_outputs,
+            "transactionStatsByhourInterval": interval_stats,
+        }
+    }
 
-#     overall_type.update(daily_summary.get("type", {}))
-#     overall_operation.update(daily_summary.get("operation", {}))
-#     overall_error.update(daily_summary.get("error", {}))
-#     overall_result.update(daily_summary.get("result", {}))
+    daily_collection.update_one(
+        {"date": start_time_iso[:10]},
+        {"$set": summary_doc},
+        upsert=True
+    )
+    return 
 
-#     # Update aggregated metrics
-#     count_days = overall_doc.get("count_days", 0) + 1
-#     success_rate_sum = overall_doc.get("successRate", 0) * overall_doc.get("count_days", 0)
-#     avg_time_sum = overall_doc.get("averageProcessingTime", 0) * overall_doc.get("count_days", 0)
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-#     # Calculate new averages
-#     new_success_rate = daily_summary.get("successRate", 0)
-#     new_avg_time = daily_summary.get("averageProcessingTime", 0)
 
-#     updated_doc = {
-#         "_id": "overall_summary",
-#         "type": dict(overall_type),
-#         "operation": dict(overall_operation),
-#         "error": dict(overall_error),
-#         "result": dict(overall_result),
-#         "count_days": count_days,
-#         "successRate": (success_rate_sum + new_success_rate) / count_days if count_days > 0 else new_success_rate,
-#         "averageProcessingTime": (avg_time_sum + new_avg_time) / count_days if count_days > 0 else new_avg_time,
-#         "last_updated": date_str
-#     }
+def aggregate_overall_summary(daily_collection: Collection, overall_collection: Collection, start_date: str, end_date: str):
+    # Fetch the existing overall summary from the overall_collection
+    existing_overall_summary = overall_collection.find_one({"_id": "overall_summary"})
+    
+    # If the document exists, extract the previous summary values, otherwise initialize them
+    if existing_overall_summary:
+        overall_type = existing_overall_summary.get("type", {})
+        overall_operation = existing_overall_summary.get("operation", {})
+        overall_error = existing_overall_summary.get("error", {})
+        overall_result = existing_overall_summary.get("result", {})
+        overall_total = existing_overall_summary.get("total", 0)
+        overall_success_rate_sum = existing_overall_summary.get("successRate", 0) * existing_overall_summary.get("total", 0)
+        # overall_avg_processing_time_sum = existing_overall_summary.get("averageProcessingTime", 0) * existing_overall_summary.get("total", 0)
+        total = existing_overall_summary.get("total", 0)
+        overall_cross_type_op = existing_overall_summary.get("crossTypeOp", {})
+        overall_cross_op_type = existing_overall_summary.get("crossOpType", {})
+        overall_cross_type_error = existing_overall_summary.get("crossTypeError", {})
+        overall_cross_op_error = existing_overall_summary.get("crossOpError", {})
+        overall_processing_time_by_inputs = existing_overall_summary.get("processingTimeByInputs", {})
+        overall_processing_time_by_outputs = existing_overall_summary.get("processingTimeByOutputs", {})
+        overall_mergedTransactionAmountIntervals = existing_overall_summary.get("mergedTransactionAmountIntervals", [])
+        overall_processing_time_sum = existing_overall_summary.get("averageProcessingTime", 0)* existing_overall_summary.get("total", 0)
+        overall_onus_sum = existing_overall_summary.get("averageONUSTransactionAmount", 0)* existing_overall_summary.get("total", 0)
+        overall_offus_sum = existing_overall_summary.get("averageOFFUSTransactionAmount", 0)* existing_overall_summary.get("total", 0)
+        overall_onus_min = existing_overall_summary.get("minONUSTransactionAmount", 0)
+        overall_onus_max = existing_overall_summary.get("maxONUSTransactionAmount",0)
+        overall_offus_min = existing_overall_summary.get("minOFFUSTransactionAmount",0)
+        overall_offus_max = existing_overall_summary.get("maxOFFUSTransactionAmount", 0)
+        overall_processing_time_min = existing_overall_summary.get("minProcessingTime", 0)
+        overall_processing_time_max = existing_overall_summary.get("minProcessingTime", 0)
 
-#     # Update other fields from daily_summary if needed
-#     for field in ["mergedTransactionAmountIntervals", "total", "crossTypeOp", "crossTypeError", 
-#                   "crossOpError", "processingTimeByInputs", "processingTimeByOutputs", 
-#                   "transactionStatsByhourInterval", "duplicateTokens"]:
-#         if field in daily_summary:
-#             updated_doc[field] = daily_summary[field]
+    else:
+        # Initialize default values if no existing summary is found
+        overall_type = {}
+        overall_operation = {}
+        overall_error = {}
+        overall_result = {} 
+        overall_total = 0
+        overall_success_rate_sum = 0
+        # overall_avg_processing_time_sum = 0
+        total = 0
+        overall_cross_type_op = {}
+        overall_cross_op_type = {}
+        overall_cross_type_error = {}
+        overall_cross_op_error = {}
+        overall_processing_time_by_inputs = {}
+        overall_processing_time_by_outputs = {}
+        overall_mergedTransactionAmountIntervals = []
+        overall_processing_time_sum = 0
+        overall_onus_sum = 0
+        overall_offus_sum = 0
+        overall_onus_min = -float('inf')
+        overall_onus_max = float('inf')
+        overall_offus_min = -float('inf')
+        overall_offus_max = float('inf')
+        overall_processing_time_min =-float('inf')
+        overall_processing_time_max =float('inf')
 
-#     overall_collection.update_one(
-#         {"_id": "overall_summary"},
-#         {"$set": updated_doc},
-#         upsert=True
-#     )
+    # Fetch all documents from daily_collection and update the values
+    cursor = daily_collection.find({
+        "date": {"$gte": start_date, "$lte": end_date}  # Ensure date is within the range
+    })
+
+    # Aggregate the values for the date range
+    for doc in cursor:
+        summary = doc.get("summary", {})
+        total += 1
+        overall_total += summary.get("total", 0)
+        overall_success_rate_sum += summary.get("successRate", 0)*summary.get("total", 0)
+        # overall_avg_processing_time_sum += summary.get("averageProcessingTime", 0)
+        overall_processing_time_sum += summary.get("processingTime_average", 0)*summary.get("total", 0)
+        overall_onus_sum += summary.get("transactionAmount_ONUS_average", 0)*summary.get("total", 0)
+        overall_offus_sum  += summary.get("transactionAmount_OFFUS_average", 0)*summary.get("total", 0)
+        overall_onus_min = min( summary.get("transactionAmount_ONUS_min") ,overall_onus_min)
+        overall_onus_max =  max( summary.get("transactionAmount_ONUS_max") ,overall_onus_max)
+        overall_offus_min =  min( summary.get("transactionAmount_OFFUS_min") ,overall_offus_min)
+        overall_offus_max =  max( summary.get("transactionAmount_ONUS_max") ,overall_offus_max)
+        overall_processing_time_min = min( summary.get("processingTime_min") ,overall_processing_time_min)
+        overall_processing_time_max = max( summary.get("processingTime_max") ,overall_processing_time_max)
+
+        overall_processing_time= (overall_processing_time_sum / total) if total else 0
+        
+
+
+        # Update counts for type, operation, error, and result
+        for t, count in summary.get("type", {}).items():
+            overall_type[t] = overall_type.get(t, 0) + count
+        for o, count in summary.get("operation", {}).items():
+            overall_operation[o] = overall_operation.get(o, 0) + count
+        for e, count in summary.get("error", {}).items():
+            overall_error[e] = overall_error.get(e, 0) + count
+        for r, count in summary.get("result", {}).items():
+            overall_result[r] = overall_result.get(r, 0) + count
+
+        # Update cross-type operations, cross-type errors, and cross-operation errors
+        for t, op_dict in summary.get("crossTypeOp", {}).items():
+            for op, cnt in op_dict.items():
+                overall_cross_type_op.setdefault(t, {})[op] = overall_cross_type_op.get(t, {}).get(op, 0) + cnt
+        for op, t_dict in summary.get("crossOpType", {}).items():
+            for t, cnt in t_dict.items():
+                overall_cross_op_type.setdefault(op, {})[t] = overall_cross_op_type.get(op, {}).get(t, 0) + cnt
+        for t, err_dict in summary.get("crossTypeError", {}).items():
+            for err, cnt in err_dict.items():
+                overall_cross_type_error.setdefault(t, {})[err] = overall_cross_type_error.get(t, {}).get(err, 0) + cnt
+        for op, err_dict in summary.get("crossOpError", {}).items():
+            for err, cnt in err_dict.items():
+                overall_cross_op_error.setdefault(op, {})[err] = overall_cross_op_error.get(op, {}).get(err, 0) + cnt
+
+        # Update processing times by inputs and outputs
+        for item in summary.get("processingTimeByInputs", []):
+            overall_processing_time_by_inputs.setdefault(item["x"], []).append(item["y"])
+        for item in summary.get("processingTimeByOutputs", []):
+            overall_processing_time_by_outputs.setdefault(item["x"], []).append(item["y"])
+        
+
+
+
+        # hiiii
+        mergedTransactionfromsummary = summary.get("mergedTransactionAmountIntervals", [])
+        merged_intervals = {}
+    
+        # Iterate through the intervals and add corresponding values
+        for interval_1, interval_2 in zip(mergedTransactionfromsummary, overall_mergedTransactionAmountIntervals):
+            # Create a unique key for the interval
+            merged_intervals.append({
+            "interval": interval_1["interval"],
+            "total": interval_1["total"] + interval_2["total"],
+            "load": interval_1["load"] + interval_2["load"],
+            "transfer": interval_1["transfer"] + interval_2["transfer"],
+            "redeem": interval_1["redeem"] + interval_2["redeem"]
+        })
+    
+
+
+
+
+    # Calculate the averages for the processed times
+    avg_processing_by_inputs = [{"x": k, "y": sum(v) / len(v)} for k, v in overall_processing_time_by_inputs.items()]
+    avg_processing_by_outputs = [{"x": k, "y": sum(v) / len(v)} for k, v in overall_processing_time_by_outputs.items()]
+
+    # Calculate the average success rate and average processing time
+    overall_success_rate = (overall_success_rate_sum / total) if total else 0
+    # overall_avg_processing_time = (overall_avg_processing_time_sum / total) if total else 0
+
+    # Calculate statistics for transaction amounts and processing times
+    transaction_amount_stats = {
+        "average": sum([summary.get("transactionAmount_average", 0) for summary in cursor]) / total,
+        "min": min([summary.get("transactionAmount_min", 0) for summary in cursor]),
+        "max": max([summary.get("transactionAmount_max", 0) for summary in cursor]),
+    }
+
+    # Create the updated overall summary document
+    overall_summary_doc = {
+        "type": [{"type": k, "count": v} for k, v in overall_type.items()],
+        "operation": [{"operation": k, "count": v} for k, v in overall_operation.items()],
+        "error": [{"error": k, "count": v} for k, v in overall_error.items()],
+        "result": [{"result": k, "count": v} for k, v in overall_result.items()],
+        "total": overall_total,
+        "successRate": overall_success_rate,
+        # "averageProcessingTime": overall_avg_processing_time,
+        "crossTypeOp": overall_cross_type_op,
+        "crossTypeError": overall_cross_type_error,
+        "crossOpError": overall_cross_op_error,
+        "mergedTransactionAmountIntervals" : merged_intervals,
+        "processingTimeByInputs": avg_processing_by_inputs,
+        "processingTimeByOutputs": avg_processing_by_outputs,
+        "total": total,  # Save the number of days processed
+        "transactionAmountStats": transaction_amount_stats,  # Add transaction stats
+        "averageProcessingTime": overall_processing_time,
+        "minProcessingTime": overall_processing_time_min,
+        "maxProcessingTime": overall_processing_time_max,
+        "averageONUSTransactionAmount": overall_onus_sum,
+        "minONUSTransactionAmount": overall_onus_min,
+        "maxONUSTransactionAmount":  overall_onus_max,
+        "averageOFFUSTransactionAmount": overall_offus_sum,
+        "minOFFUSTransactionAmount":  overall_offus_min,
+        "maxOFFUSTransactionAmount":  overall_offus_max
+    }
+
+    # Update the overall summary document in the overall collection
+    overall_collection.update_one(
+        {"_id": "overall_summary"},
+        {"$set": overall_summary_doc},
+        upsert=True
+    )
+
+    return overall_summary_doc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

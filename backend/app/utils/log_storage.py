@@ -214,7 +214,7 @@ class LogStorageService:
 
             if duplicate_tokens:
                 temptoken_collection.insert_many(duplicate_tokens)
-                logger.info(duplicate_tokens)
+                # logger.info(duplicate_tokens)
                 
             return {
                 # "inserted": result.inserted_count,
