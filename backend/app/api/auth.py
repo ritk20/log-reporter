@@ -1,54 +1,49 @@
 from fastapi import APIRouter, HTTPException, Form, Response, Request
 from pydantic import BaseModel
 from datetime import timedelta
-from app.api.auth_jwt import create_access_token, create_refresh_token, verify_token, TokenPair
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt
-from app.core.config import settings
-from pymongo import MongoClient
+from jose import jwt, JWTError
 import bcrypt
-
-SECRET_KEY = settings.SECRET_KEY
-ALGORITHM = settings.ALGORITHM
+from pymongo import MongoClient
+from app.core.config import settings
+from app.api.auth_jwt import (
+    create_access_token, create_refresh_token,
+    ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS,
+    SECRET_KEY, ALGORITHM
+)
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
+# MongoDB connection (only for login validation)
 client = MongoClient(settings.MONGODB_URL)
 db = client[settings.MONGODB_DB_NAME]
-collection = db[settings.MONGODB_LOGIN] 
+login_collection = db[settings.MONGODB_LOGIN]
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-
+# Login response model
 class LoginResponse(BaseModel):
     access_token: str
-    refresh_token: str
     token_type: str
 
+# Authenticate user using DB
 def authenticate_user(username: str, password: str):
-    user_data = collection.find_one({"_id": username})  
-
+    print(f"[DEBUG] Authenticating user: {username}")
+    user_data = login_collection.find_one({"_id": username})
     if not user_data:
-        print("[ERROR] User not found in DB.")
+        print("[ERROR] User not found.")
         return None
-
-    print(f"[DEBUG] Found user: {user_data['_id']}, Role: {user_data.get('role')}")
-
     if "password" not in user_data:
-        print("[ERROR] Password field missing in DB entry.")
+        print("[ERROR] Password not set.")
         return None
-
     db_password = user_data["password"]
-    print(f"[DEBUG] Comparing password...")
-
     if bcrypt.checkpw(password.encode('utf-8'), db_password.encode('utf-8')):
-        print("[SUCCESS] Password match.")
+        print("[SUCCESS] Authenticated.")
         return {"email": username, "role": user_data.get("role", "user")}
     else:
-        print("[ERROR] Password mismatch.")
+        print("[ERROR] Incorrect password.")
         return None
 
+# Login route
 @router.post("/login", response_model=LoginResponse)
-async def login(    
+async def login(
     response: Response,
     username: str = Form(...),
     password: str = Form(...)
@@ -59,49 +54,67 @@ async def login(
 
     access_token = create_access_token(
         data={"sub": user["email"], "role": user["role"]},
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    refresh_token = create_refresh_token(
+
+    refresh_token, _ = create_refresh_token(
         data={"sub": user["email"], "role": user["role"]}
     )
-    # Set HTTP-only cookie for refresh token
+
+    # Set refresh token in HTTP-only cookie
     response.set_cookie(
         key="refresh-token",
         value=refresh_token,
         httponly=True,
-        secure=False,  # Set to True with HTTPS
-        samesite="strict",
-        max_age=60 * 60 * 24 * settings.REFRESH_TOKEN_EXPIRE_DAYS,
-        path="/"
+        secure=False,  # Set to True in production with HTTPS
+        samesite="Strict",
+        path="/api/auth",
+        max_age=60 * 60 * 24 * REFRESH_TOKEN_EXPIRE_DAYS
     )
+
     return {
         "access_token": access_token,
-        "refresh_token": refresh_token,
         "token_type": "bearer"
     }
 
-@router.post("/refresh", response_model=TokenPair)
+
+# Refresh token endpoint
+@router.post("/refresh", response_model=LoginResponse)
 async def refresh_token(request: Request):
+    print("[DEBUG] Refreshing token")
     refresh_token = request.cookies.get("refresh-token")
     if not refresh_token:
-        print("[ERROR] No refresh token found in cookies.")
-        raise HTTPException(status_code=401, detail="Refresh token not found")
+        raise HTTPException(status_code=401, detail="Missing refresh token")
 
     try:
-        payload = verify_token(refresh_token, token_type="refresh")
-        
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+
+        user_id = payload.get("sub")
+        role = payload.get("role")
+
         new_access_token = create_access_token(
-            data={"sub": payload["username"], "role": payload["roles"][0]},
-            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            data={"sub": user_id, "role": role},
+            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         )
-        new_refresh_token = create_refresh_token(
-            data={"sub": payload["username"], "role": payload["roles"][0]}
-        )
-        
+
         return {
             "access_token": new_access_token,
-            "refresh_token": new_refresh_token,
             "token_type": "bearer"
         }
-    except HTTPException:
+
+    except JWTError as e:
+        print("[ERROR] JWT decode error:", e)
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+@router.post("/logout")
+async def logout(response: Response):
+    """
+    Clears the 'refresh-token' cookie so that refresh() can no longer issue tokens.
+    """
+    response.delete_cookie(
+        key="refresh-token",
+        path="/api/auth",    # must match the path you set on login
+    )
+    return {"msg": "Successfully logged out"}

@@ -12,6 +12,7 @@ from app.api.duplicates import router as duplicate_router
 from app.api.custom_query import router as custom_router
 from dotenv import load_dotenv
 from app.database.database import get_collection
+from app.middleware.auth import JWTMiddleware
 import logging
 load_dotenv()
 
@@ -41,6 +42,7 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+app.add_middleware(JWTMiddleware)
 app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(analytics_router)
@@ -66,7 +68,7 @@ async def read_sample():
         logger.info(f"Raw document: {doc}")
         
         if doc:
-            doc["_id"] = str(doc["_id"])  # Convert ObjectId manually
+            doc["_id"] = str(doc["_id"])
         return {"sample": doc}
     except Exception as e:
         logger.error(f"Error in /sample: {str(e)}")
@@ -80,13 +82,3 @@ async def mongo_health_check():
         return {"status": "ok", "total_logs": count}
     except Exception as e:
         return {"status": "error", "message": str(e)}
-    
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print("Starting app - connecting to MongoDB")
-    await connect_to_mongo()
-    yield
-    print("Shutting down app - closing MongoDB connection")
-    await close_mongo_connection()
-
-app.router.lifespan_context = lifespan
