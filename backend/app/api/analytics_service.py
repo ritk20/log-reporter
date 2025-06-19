@@ -1005,3 +1005,11 @@ def aggregate_overall_summary(daily_collection: Collection, overall_collection: 
 
 
 
+<<<<<<< HEAD
+=======
+#     overall_collection.update_one(
+#         {"_id": "overall_summary"},
+#         {"$set": updated_doc},
+#         upsert=True
+#     )
+>>>>>>> 34ed8be849781c8a7424367ff2827ed3aa9cd4fc
