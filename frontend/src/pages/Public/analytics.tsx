@@ -654,9 +654,10 @@ export default function AnalyticsPage() {
                 data.temporal
                   ?? data.transactionStatsByhourInterval?.map(e => ({
                     ...e,
+                    byCount: e.byCount || {},
+                    byAmount: e.byAmount || {},
                     byType: e.byType || {},
                     byOp: e.byOp || {},
-                    byErr: e.byErr || {}
                   }))
                   ?? []
               }

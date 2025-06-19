@@ -16,7 +16,7 @@ def get_type_counts(collection: Collection):
     return {res["_id"]: res["count"] for res in results if res["_id"]}
 
 def get_sum_amounts(collection: Collection):
-    pipeline = [{"$group": {"_id": None, "total_amount": {"$sum": "Amount"}}}]
+    pipeline = [{"$group": {"_id": None, "total_amount": {"$sum": "Req_Tot_Amount"}}}]
     results = list(collection.aggregate(pipeline))
     return  results[0]["total_amount"] 
 
