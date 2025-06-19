@@ -3,3 +3,4 @@ pymongo
 dotenv
 python-jose
 bycrypt
+pandas
