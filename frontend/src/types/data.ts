@@ -117,11 +117,11 @@ export interface AggEntry {
   date?: string; // "YYYY-MM-DD"
   interval_start?: string;
   interval_end?: string;
-  count: number;
-  sum_amount: number;
+  byCount: Record<string, number>;
+  byAmount: Record<string, number>;
   byType?: Record<string, number>;
   byOp?:   Record<string, number>;
-  byErr?:  Record<string, number>;
+  // byErr?:  Record<string, number>;
 }
 
 export type TxSummary = {

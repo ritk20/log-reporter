@@ -4,11 +4,11 @@ import type { AggEntry } from '../../types/data';
 
 type Bucket = {
   key: string;
-  count: number;
-  sum_amount?: number;
+  byCount: Record<string, number>;
+  byAmount: Record<string, number>;
   byType: Record<string, number>;
   byOp: Record<string, number>;
-  byErr: Record<string, number>;
+  // byErr: Record<string, number>; //remove for now
 }
 
 interface ChartConfig {
@@ -16,7 +16,7 @@ interface ChartConfig {
   title: string;
   filter: '24hrs' | '7days' | '30days' | 'custom';
   customRange: { from: string; to: string };
-  groupBy: 'count' | 'sum_amount' | 'type' | 'operation' | 'error';
+  groupBy: 'count' | 'amount' | 'type' | 'operation';
   enabledCats: string[];
 }
 
@@ -44,16 +44,6 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
       enabledCats: []
     }
   ]);
-
-  // Safely handle missing breakdown properties
-  const safeAggregatedData = useMemo(() => {
-    return aggregatedData.map(entry => ({
-      ...entry,
-      byType: entry.byType || {},
-      byOp: entry.byOp || {},
-      byErr: entry.byErr || {},
-    }));
-  }, [aggregatedData]);
 
   // Add new chart
   const addChart = () => {
@@ -114,19 +104,18 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
 
       // Generate buckets
       let buckets: Bucket[] = [];
-      if (!safeAggregatedData || safeAggregatedData.length === 0) {
+      if (!aggregatedData || aggregatedData.length === 0) {
         buckets = [];
       } else if (isHourlyData) {
-        buckets = safeAggregatedData.map(entry => ({
+        buckets = aggregatedData.map(entry => ({
           key: new Date(entry.interval_start!).toLocaleString(),
-          count: entry.count,
-          sum_amount: entry.sum_amount,
+          byCount: { ...entry.byCount },
+          byAmount: { ...entry.byAmount },
           byType: { ...entry.byType },
-          byOp: { ...entry.byOp },
-          byErr: { ...entry.byErr },
+          byOp: { ...entry.byOp }
         }));
       } else {
-        const filtered = safeAggregatedData.filter(entry => {
+        const filtered = aggregatedData.filter(entry => {
           const entryDate = isHourlyData
             ? parseIntervalStart(entry.interval_start!)
             : new Date(entry.date!);
@@ -149,11 +138,10 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
             : entry.date!;
           return {
             key,
-            count: entry.count,
-            sum_amount: entry.sum_amount,
+            byCount: { ...entry.byCount },
+            byAmount: { ...entry.byAmount },
             byType: { ...entry.byType },
-            byOp: { ...entry.byOp },
-            byErr: { ...entry.byErr },
+            byOp: { ...entry.byOp }
           };
         });
       }
@@ -162,33 +150,27 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
 
       // Generate series data
       let allSeries: SeriesItem[] = [];
-      if (groupBy === 'count') {
-        allSeries = [{ name: 'Tx Count', type: 'line', data: buckets.map(b => b.count) }];
-      } else if (groupBy === 'sum_amount') {
-        allSeries = [{ name: 'Sum Amount', type: 'line', data: buckets.map(b => b.sum_amount) }];
-      } else {
-        const key = groupBy === 'type' ? 'byType' : groupBy === 'operation' ? 'byOp' : 'byErr';
-        const cats = Array.from(new Set(
-          buckets.flatMap(b => Object.keys((b as Bucket)[key as keyof Pick<Bucket, 'byType' | 'byOp' | 'byErr'>] as Record<string, number>))
-        ));
-        allSeries = cats.map(cat => ({
-          name: cat,
-          type: 'line' as const,
-          data: buckets.map(b => {
-            const record = (b as Bucket)[key as keyof Bucket] as Record<string, number>;
-            return record[cat] || 0;
-          })
-        }));
-      }
+      const key = groupBy === 'count' ? 'byCount' : groupBy === 'amount' ? 'byAmount' : groupBy === 'type' ? 'byType' : 'byOp'; 
+      const cats = Array.from(new Set(
+        buckets.flatMap(b => Object.keys((b as Bucket)[key as keyof Pick<Bucket, 'byCount' | 'byAmount' | 'byType' | 'byOp'>] as Record<string, number>))
+      ));
+      allSeries = cats.map(cat => ({
+        name: cat,
+        type: 'line' as const,
+        data: buckets.map(b => {
+          const record = (b as Bucket)[key as keyof Bucket] as Record<string, number>;
+          return record[cat] || 0;
+        })
+      }));
 
-      const series = (groupBy === 'type' || groupBy === 'operation' || groupBy === 'error')
+      const series = (groupBy === 'count' || groupBy === 'amount' || groupBy === 'type' || groupBy === 'operation')
         ? allSeries.filter(s => enabledCats.includes(s.name))
         : allSeries;
 
       map[config.id] = { dates, series, allSeries };
     });
     return map;
-  }, [chartConfigs, safeAggregatedData, isHourlyData]);
+  }, [chartConfigs, aggregatedData, isHourlyData]);
 
   // getChartData returns memoized data for a config
   const getChartData = useCallback((config: ChartConfig) => {
@@ -199,7 +181,7 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
   const groupByList = chartConfigs.map(c => c.groupBy).join(',');
   useEffect(() => {
     chartConfigs.forEach(config => {
-      if (config.groupBy === 'type' || config.groupBy === 'operation' || config.groupBy === 'error') {
+      if (config.groupBy === 'count' || config.groupBy === 'amount' || config.groupBy === 'type' || config.groupBy === 'operation') {
         const { allSeries } = getChartData(config);
         // Only update if categories changed
         const currentCats = config.enabledCats;
@@ -361,15 +343,14 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
                       <select
                         value={config.groupBy}
                         onChange={(e) => updateChartConfig(config.id, { 
-                          groupBy: e.target.value as 'count' | 'sum_amount' | 'type' | 'operation' | 'error' 
+                          groupBy: e.target.value as 'count' | 'amount' | 'type' | 'operation'
                         })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                       >
                         <option value="count">Tx Volume</option>
-                        <option value="sum_amount">Tx Amounts</option>
+                        <option value="amount">Tx Amounts</option>
                         <option value="type">By Type</option>
                         <option value="operation">By Operation</option>
-                        <option value="error">By Error</option>
                       </select>
                     </div>
                   </div>
