@@ -7,7 +7,7 @@ export default function Search() {
   const [searchResults, setSearchResults] = useState([]);
   const [searchTotal, setSearchTotal] = useState(0);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   // Add this handler
   // Replace 'unknown' with your actual result type if available, e.g., SearchResult[]
@@ -15,6 +15,7 @@ export default function Search() {
     setSearchResults(results as []);
     setSearchTotal(total);
     setShowSearchResults(results.length > 0);
+    searchTotal;
   };
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-8">

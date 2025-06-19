@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  mongo:
+    image: mongo:8.0.10
+    container_name: mongo
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secret123
+
+  backend:
+    build: ./backend
+    container_name: fastapi-app
+    volumes:
+      - ./backend:/code
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=mongodb://admin:secret123@mongo:27017/?authSource=admin
+      - MONGODB_DB_NAME=logs
+      - MONGODB_COLLECTION_NAME=master
+      - MONGODB_DAILY_SUMM_COLLECTION_NAME=Daily_Transaction_Summary2
+      - MONGODB_SUMM_COLLECTION_NAME=Transaction_summary
+      - MONGODB_TEMP_COLLECTION_NAME=Temp
+      - MONGODB_TOKENS_COLLECTION_NAME=tokens
+      - MONGODB_TEMP_TOKENS_COLLECTION_NAME=tempTokens
+      - MONGODB_REFRESH_TOKEN_NAME=Refresh_Token
+      - MONGODB_LOGIN=login_collection
+      - SECRET_KEY=your-secret-key
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=1
+      - REFRESH_TOKEN_EXPIRE_DAYS=1
+    depends_on:
+      - mongo
+
+  frontend:
+    build: ./frontend
+    container_name: react-app
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    tty: true
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:

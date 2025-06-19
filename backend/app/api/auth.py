@@ -1,70 +1,123 @@
-from fastapi import APIRouter, HTTPException, Form, Depends
+from fastapi import APIRouter, HTTPException, Form, Response, Request
 from pydantic import BaseModel
 from datetime import timedelta
-from app.api.auth_jwt import create_access_token, create_refresh_token, verify_token, revoke_refresh_token, TokenPair,SECRET_KEY,ALGORITHM
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt
+from jose import jwt, JWTError
+import bcrypt
+from pymongo import MongoClient
+from app.core.config import settings
+from app.api.auth_jwt import (
+    create_access_token, create_refresh_token, verify_token,
+    ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS,
+    SECRET_KEY, ALGORITHM
+)
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
-USERS_DB = {
-    "admin@test.com": {"password": "admin123", "role": "admin"},
-    "viewer@test.com": {"password": "viewer123", "role": "viewer"}
-}
+# MongoDB connection (only for login validation)
+client = MongoClient(settings.MONGODB_URL)
+db = client[settings.MONGODB_DB_NAME]
+login_collection = db[settings.MONGODB_LOGIN]
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-
+# Login response model
 class LoginResponse(BaseModel):
     access_token: str
-    refresh_token: str
     token_type: str
 
-def authenticate_user(username: str, password: str):
-    user_data = USERS_DB.get(username)
-    if user_data and user_data["password"] == password:
-        return {"email": username, "role": user_data["role"]}
-    return None
 
+# Authenticate user using DB
+def authenticate_user(username: str, password: str):
+    print(f"[DEBUG] Authenticating user: {username}")
+    user_data = login_collection.find_one({"_id": username})
+    if not user_data:
+        print("[ERROR] User not found.")
+        return None
+    if "password" not in user_data:
+        print("[ERROR] Password not set.")
+        return None
+    db_password = user_data["password"]
+    if bcrypt.checkpw(password.encode('utf-8'), db_password.encode('utf-8')):
+        print("[SUCCESS] Authenticated.")
+        return {"email": username, "role": user_data.get("role", "user")}
+    else:
+        print("[ERROR] Incorrect password.")
+        return None
+
+
+# Login route
 @router.post("/login", response_model=LoginResponse)
-async def login(username: str = Form(...), password: str = Form(...)):
+async def login(
+    response: Response,
+    username: str = Form(...),
+    password: str = Form(...)
+):
     user = authenticate_user(username, password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
     access_token = create_access_token(
         data={"sub": user["email"], "role": user["role"]},
-        expires_delta=timedelta(minutes=30)
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    refresh_token, token_id = create_refresh_token(
+
+    refresh_token, _ = create_refresh_token(
         data={"sub": user["email"], "role": user["role"]}
     )
+
+    # Set refresh token in HTTP-only cookie
+    response.set_cookie(
+        key="refresh-token",
+        value=refresh_token,
+        httponly=True,
+        secure=False,  # Set to True in production with HTTPS
+        samesite="Strict",
+        path="/api/auth",
+        max_age=60 * 60 * 24 * REFRESH_TOKEN_EXPIRE_DAYS
+    )
+
     return {
         "access_token": access_token,
-        "refresh_token": refresh_token,
         "token_type": "bearer"
     }
 
-@router.post("/refresh", response_model=TokenPair)
-async def refresh_token(refresh_token: str = Form(...)):
+
+# Refresh token endpoint
+@router.post("/refresh", response_model=LoginResponse)
+async def refresh_token(request: Request):
+    print("[DEBUG] Refreshing token")
+    refresh_token = request.cookies.get("refresh-token")
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Missing refresh token")
+
     try:
-        payload = verify_token(refresh_token, token_type="refresh")
-        token_id = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM]).get("jti")
-        
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+
+        user_id = payload.get("sub")
+        role = payload.get("role")
+
         new_access_token = create_access_token(
-            data={"sub": payload["username"], "role": payload["roles"][0]},
-            expires_delta=timedelta(minutes=30)
+            data={"sub": user_id, "role": role},
+            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         )
-        new_refresh_token, new_token_id = create_refresh_token(
-            data={"sub": payload["username"], "role": payload["roles"][0]}
-        )
-        
-        # Revoke old refresh token
-        revoke_refresh_token(token_id)
-        
+
         return {
             "access_token": new_access_token,
-            "refresh_token": new_refresh_token,
             "token_type": "bearer"
         }
-    except HTTPException:
+
+    except JWTError as e:
+        print("[ERROR] JWT decode error:", e)
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+from fastapi import Response
+
+@router.post("/logout")
+async def logout(response: Response):
+    """
+    Clears the 'refresh-token' cookie so that refresh() can no longer issue tokens.
+    """
+    response.delete_cookie(
+        key="refresh-token",
+        path="/api/auth",    # must match the path you set on login
+    )
+    return {"msg": "Successfully logged out"}

@@ -4,9 +4,9 @@ from fastapi import FastAPI, Query, Depends
 from datetime import datetime, timezone
 import logging
 
-app = FastAPI()
+router = FastAPI()
 
-@app.get("/api/duplicate-tokens")
+@router.get("/api/duplicate-tokens")
 async def get_duplicate_tokens(
     time_value: int = Query(7, description="Time period value"),
     time_unit: str = Query("days", description="Time unit: hours, days, weeks, months, years"),
@@ -34,7 +34,7 @@ async def get_duplicate_tokens(
             "data": []
         }
 
-@app.get("/api/duplicate-tokens/summary")
+@router.get("/api/duplicate-tokens/summary")
 async def get_duplicate_summary(
     time_value: int = Query(7, description="Time period value"),
     time_unit: str = Query("days", description="Time unit"),

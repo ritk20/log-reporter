@@ -8,6 +8,9 @@ class Settings:
     # Project settings
     PROJECT_NAME: str = "Log Reporter"
     API_STR: str = "/api"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30 
+    REFRESH_TOKEN_EXPIRE_DAYS :int = 30
+    
 
     # CORS settings
     ALL_CORS_ORIGINS: List[str] = [
@@ -35,6 +38,7 @@ class Settings:
     MONGODB_TEMP_TOKENS_COLLECTION_NAME: str = os.getenv("MONGODB_TEMP_TOKENS_COLLECTION_NAME", "tempTokens2")
     MONGODB_TEMP_COLLECTION_NAME: str = os.getenv("MONGODB_TEMP_COLLECTION_NAME","Temp2")
     MONGODB_REFRESH_TOKEN_NAME:str=os.getenv("MONGODB_REFRESH_TOKEN_NAME","Refresh_Token")
+    MONGODB_LOGIN:str=os.getenv("MONGODB_LOGIN","login_collection")
 
 
     class Config:

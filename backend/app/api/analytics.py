@@ -15,7 +15,6 @@ tempcollection = db[settings.MONGODB_TEMP_COLLECTION_NAME]
 daily_collection = db[settings.MONGODB_DAILY_SUMM_COLLECTION_NAME]
 overall_collection = db[settings.MONGODB_SUMM_COLLECTION_NAME]
 
-
 @router.get("/latest-date", tags=["Analytics"])
 async def get_latest_date(auth : dict = Depends(verify_token)):
     """Get the date of the most recent daily summary"""

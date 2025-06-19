@@ -38,7 +38,7 @@ interface SearchComponentProps {
 }
 
 export function SearchComponent({ onResultsUpdate }: SearchComponentProps) {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('search') || '');
   const [searchType, setSearchType] = useState<'token' | 'serial' | 'transaction'>('token');
   const [results, setResults] = useState<SearchResult[]>([]);

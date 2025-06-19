@@ -1,57 +1,50 @@
-# backend/app/routers/temporal.py
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query, HTTPException, Depends
+from pymongo import MongoClient
 from datetime import datetime
-from app.database.database import get_daily_collection
+from typing import Optional
+from app.api.auth_jwt import verify_token
+from app.core.config import settings
 
-router = APIRouter(prefix="/temporal", tags=["temporal"])
+router = APIRouter(prefix="/api/temporal", tags=["temporal"])
 
-@router.get("/")
+client = MongoClient(settings.MONGODB_URL)
+db = client[settings.MONGODB_DB_NAME]
+collection = db["Daily_Transaction_Summary2"]
+
+@router.get("/temp")
 async def get_temporal(
-    from_date: str = Query(..., description="Start date in YYYY-MM-DD"),
-    to_date:   str = Query(..., description="End date in YYYY-MM-DD"),
+    from_date: str = Query(...),
+    to_date: str = Query(...),
+    token_data: dict = Depends(verify_token)
 ):
-    """
-    Fetch daily summary documents between from_date and to_date (inclusive).
-    Expects date strings in 'YYYY-MM-DD' format.
-    """
-    # Validate date format
     try:
         from_dt = datetime.strptime(from_date, "%Y-%m-%d").date()
         to_dt = datetime.strptime(to_date, "%Y-%m-%d").date()
+
+        if from_dt > to_dt:
+            raise HTTPException(status_code=400, detail="from_date must be <= to_date")
     except ValueError:
-        raise HTTPException(status_code=400, detail="Dates must be in YYYY-MM-DD format")
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
-    if from_dt > to_dt:
-        raise HTTPException(status_code=400, detail="from_date must be <= to_date")
-
-    coll = get_daily_collection()
-
-    # We assume documents have a field "date" stored as string "YYYY-MM-DD".
-    # If stored as a Date type, you can query by ISODate and convert to string.
-    query = {
-        "date": { "$gte": from_date, "$lte": to_date }
-    }
-    # Projection: only fields needed
-    projection = {
-        "_id": 0,
-        "date": 1,
-        "total": 1,
-        # "sum_amount": 1,
-        "byType": 1,
-        "byOp": 1,
-        "byErr": 1,
-    }
-    cursor = coll.find(query, projection).sort("date", 1)
-    results = []
-    async for doc in cursor:
-        # If your field names differ, map here; e.g. use doc["total"] for count
-        entry = {
-            "date": doc["date"],
-            "total": doc.get("count", doc.get("total", 0)),
-            # "sum_amount": float(doc.get("sum_amount", 0.0)),
-            "byType": doc.get("byType", {}),
-            "byOp": doc.get("byOp", {}),
-            "byErr": doc.get("byErr", {}),
+    cursor = collection.find(
+        {
+            "date": {
+                "$gte": from_date,
+                "$lte": to_date
+            }
         }
-        results.append(entry)
+    ).sort("date", 1)
+
+    results = []
+    for doc in cursor:
+        summary = doc.get("summary", {})
+        results.append({
+            "date": doc.get("date"),
+            "total": summary.get("total", 0),
+            "sum_amount": summary.get("sum_amount", 0.0),  # Optional: add this if present
+            "byType": summary.get("type", {}),
+            "byOp": summary.get("operation", {}),
+            "byErr": summary.get("error", {})
+        })
+
     return {"data": results}

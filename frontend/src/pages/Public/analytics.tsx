@@ -500,7 +500,7 @@ export default function AnalyticsPage() {
 
           {/* Statistical KPI Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <KPICard
+            {/* <KPICard
               title="Transaction Amounts"
               mean={data.averageTransactionAmount}
               stdev={data.stdevTransactionAmount}
@@ -511,7 +511,7 @@ export default function AnalyticsPage() {
               percentile75={data.percentile75TransactionAmount}
               unit=" Rs" //hardcoded to Rs
               colorScheme="blue"
-            />
+            /> */}
             
             <KPICard
               title="Processing Time"

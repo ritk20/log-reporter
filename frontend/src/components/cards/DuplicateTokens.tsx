@@ -19,14 +19,14 @@ export default function DuplicateTokensTable({ data, total }: DuplicateTokensTab
     setExpanded(prev => ({ ...prev, [tokenId]: !prev[tokenId] }));
   };
 
-  const handleSort = (field: typeof sortBy) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('desc');
-    }
-  };
+  // const handleSort = (field: typeof sortBy) => {
+   // if (sortBy === field) {
+    //  setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    //} else {
+      //setSortBy(field);
+     // setSortOrder('desc');
+    //}
+ // };
 
   // Filter and sort data
   const filteredData = data.filter(token => 

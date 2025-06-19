@@ -15,6 +15,7 @@ class MongoDB:
     daily_summary = None
     overall_summary = None
     refresh_token_coll = None  # NEW
+    login_data=None
 
 mongodb = MongoDB()
 
@@ -41,6 +42,7 @@ async def connect_to_mongo():
         daily_collection = database[settings.MONGODB_DAILY_SUMM_COLLECTION_NAME]
         overall_collection = database[settings.MONGODB_SUMM_COLLECTION_NAME]
         refresh_token_coll = database[settings.MONGODB_REFRESH_TOKEN_NAME]  # NEW
+        login_data=database[settings.MONGODB_LOGIN]
 
         mongodb.token_coll = token_coll
         mongodb.temp_coll = temp_coll
@@ -48,6 +50,7 @@ async def connect_to_mongo():
         mongodb.daily_summary = daily_collection
         mongodb.overall_summary = overall_collection
         mongodb.refresh_token_coll = refresh_token_coll  # NEW
+        mongodb.login_data=login_data
 
         initialize_collections()
 
@@ -150,6 +153,13 @@ def get_tokens_collection():
         logger.error("MongoDB tokens collection not initialized")
         raise RuntimeError("Database connection not established")
     return mongodb.token_coll
+
+def get_login_data():
+    if mongodb.login_data is None:
+        logger.error("MongoDB Login collection is not initialized")
+        raise RuntimeError("Conection not established")
+    return mongodb.login_data
+    
 
 
 def get_temp_collection():

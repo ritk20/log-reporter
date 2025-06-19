@@ -1,5 +1,5 @@
 // components/search/SearchResults.tsx
-import { useState } from 'react';
+import {} from 'react';
 
 interface SearchResult {
   id?: string;
@@ -20,7 +20,7 @@ interface SearchResultsProps {
   loading: boolean;
 }
 
-export function SearchResults({ results, searchType, loading }: SearchResultsProps) {
+export function SearchResults({ results,loading }: SearchResultsProps) {
 
   if (loading) {
     return (
