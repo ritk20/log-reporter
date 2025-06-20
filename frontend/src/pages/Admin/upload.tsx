@@ -38,7 +38,7 @@ export default function Upload() {
       const response = await fetch('http://localhost:8000/api/upload/upload', {
         method: 'POST',
         credentials: 'include',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
 
