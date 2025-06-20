@@ -140,9 +140,6 @@ export type TxSummary = {
   OFFUSTotalAmount: number
   minOFFUSTransactionAmount: number
   maxOFFUSTransactionAmount: number
-  averageTransactionAmount: number
-  minTransactionAmount: number
-  maxTransactionAmount: number
   operation: Record<Tx['operation'], number> //all operation types (redundant)
   type: Record<Tx['type'],number> // all transaction type (redundant)
   error: Record<Tx['error'], number>  //all error divisions (redundant)

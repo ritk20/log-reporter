@@ -279,6 +279,7 @@ export default function AnalyticsPage() {
       }
     }, 1000);
   };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* Dashboard Header */}
@@ -567,10 +568,10 @@ export default function AnalyticsPage() {
             />
             <KPICard
               title="Total Transaction Amount"
-              mean={data.averageTransactionAmount}
+              mean={data.averageOFFUSTransactionAmount + data.averageONUSTransactionAmount}
               total={data.ONUSTotalAmount + data.OFFUSTotalAmount}
-              min={data.minTransactionAmount}
-              max={data.maxTransactionAmount}
+              min={Math.min(data.minONUSTransactionAmount, data.minOFFUSTransactionAmount)}
+              max={Math.max(data.maxONUSTransactionAmount, data.maxOFFUSTransactionAmount)}
               unit="s"
               colorScheme="green"
             />
