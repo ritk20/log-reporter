@@ -2,5 +2,5 @@ fastapi[standard]
 pymongo
 dotenv
 python-jose
-bycrypt
+bcrypt
 pandas
