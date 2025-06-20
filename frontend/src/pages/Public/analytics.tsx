@@ -550,6 +550,7 @@ export default function AnalyticsPage() {
             <KPICard
               title="OFFUS Transaction Amount"
               mean={data.averageOFFUSTransactionAmount}
+              total={data.OFFUSTotalAmount}
               min={data.minOFFUSTransactionAmount}
               max={data.maxOFFUSTransactionAmount}
               unit=" Rs" //hardcoded to Rs
@@ -558,16 +559,18 @@ export default function AnalyticsPage() {
             <KPICard
               title="ONUS Transaction Amount"
               mean={data.averageONUSTransactionAmount}
+              total={data.ONUSTotalAmount}
               min={data.minONUSTransactionAmount}
               max={data.maxONUSTransactionAmount}
               unit=" Rs" //hardcoded to Rs
               colorScheme="purple"
             />
             <KPICard
-              title="Processing Time"
-              mean={data.averageProcessingTime}
-              min={data.minProcessingTime}
-              max={data.maxProcessingTime}
+              title="Total Transaction Amount"
+              mean={data.averageTransactionAmount}
+              total={data.ONUSTotalAmount + data.OFFUSTotalAmount}
+              min={data.minTransactionAmount}
+              max={data.maxTransactionAmount}
               unit="s"
               colorScheme="green"
             />

@@ -79,13 +79,17 @@ def get_amount_buckets(collection: Collection, n_intervals=10):
             "total": 0,
             "LOAD": 0,
             "TRANSFER": 0,
-            "REDEEM": 0
+            "REDEEM": 0,
+            "SPLIT": 0,
+            "MERGE": 0,
+            "ISSUE": 0
         })
 
     # Now, go through the collection and count amounts per bucket
     cursor = collection.find({}, {
         "input_amount": 1,
         "Type_Of_Transaction": 1,
+        "Operation": 1,
         "Result_of_Transaction": 1,
         "Time_to_Transaction_secs": 1
     })
@@ -97,6 +101,7 @@ def get_amount_buckets(collection: Collection, n_intervals=10):
     for doc in cursor:
         amt = doc.get("input_amount", 0)
         typ = doc.get("Type_Of_Transaction", "UNKNOWN")
+        op = doc.get("Operation", "UNKNOWN")
         res_val = doc.get("Result_of_Transaction")
         if isinstance(res_val, str):
             res = res_val.upper()
@@ -117,6 +122,8 @@ def get_amount_buckets(collection: Collection, n_intervals=10):
                 bucket["total"] += 1
                 if typ in bucket:
                     bucket[typ] += 1
+                if op in bucket:
+                    bucket[op] += 1
                 break
 
     # Prepare the final list of bucket documents for returning
@@ -128,6 +135,9 @@ def get_amount_buckets(collection: Collection, n_intervals=10):
             "load": b["LOAD"],
             "transfer": b["TRANSFER"],
             "redeem": b["REDEEM"],
+            "split": b["SPLIT"],
+            "merge": b["MERGE"],
+            "issue": b["ISSUE"]
         })
 
     success_rate = total_success / total_transactions if total_transactions else 0
@@ -300,11 +310,11 @@ def calculate_transaction_statistics(collection):
                     OffUs.append(amount)
 
     stats = {}
-    stats.update(compute_stats(processing_times, "processingTime")) if processing_times else \
-        stats.update({k: 0 for k in compute_stats([0], "processingTime").keys()})
+    stats.update(compute_stats(processing_times, "ProcessingTime")) if processing_times else \
+        stats.update({k: 0 for k in compute_stats([0], "ProcessingTime").keys()})
 
-    stats.update(compute_stats(transaction_amounts, "transactionAmount")) if transaction_amounts else \
-        stats.update({k: 0 for k in compute_stats([0], "transactionAmount").keys()})
+    stats.update(compute_stats(transaction_amounts, "TransactionAmount")) if transaction_amounts else \
+        stats.update({k: 0 for k in compute_stats([0], "TransactionAmount").keys()})
 
     stats.update(compute_stats(OnUs, "ONUSTransactionAmount")) if OnUs else \
         stats.update({k: 0 for k in compute_stats([0], "ONUSTransactionAmount").keys()})
@@ -356,7 +366,7 @@ def aggregate_daily_summary(collection, daily_collection):
     duplicate_tokens = list(temp_token_coll.find({}, {'_id': 0}))
 
     summary_doc = {
-        "date": start_time_iso[:10],  # Ensure consistent date key
+        "date": start_time_iso[:10],
         "start_time": start_time_iso,
         "end_time": end_time_iso,
         "summary": {
@@ -366,7 +376,7 @@ def aggregate_daily_summary(collection, daily_collection):
             "error": dict(error_counts),
             "errorDocs": error_docs,  
             "result": dict(result_counts),
-            "sum_amount":sum_amount,
+            "sumAmount":sum_amount,
             "mergedTransactionAmountIntervals": bucket_docs,
             "total": total_transactions,
             "successRate": success_rate * 100,
