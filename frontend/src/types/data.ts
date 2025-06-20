@@ -1,4 +1,4 @@
-import type { TransactionType, OperationType, ErrorCode, TransactionResult } from './enums';
+import type { TransactionType, OperationType, ErrorCode, TransactionResult, MongoDate } from './enums';
 //TODO: Change the data to match the summary data from the backend analytics
 export type Tx = {
   Transaction_Id: string
@@ -99,17 +99,19 @@ export interface TransactionStats {
 export interface DuplicateToken {
   tokenId: string;
   count: number;
-  firstSeen?: string;
-  lastSeen?: string;
-  totalAmount?: number;
-  uniqueSenderOrgs?: number;
-  uniqueReceiverOrgs?: number;
+  firstSeen: MongoDate;
+  lastSeen: MongoDate;
+  totalAmount: number;
+  uniqueSenderOrgs: number;
+  uniqueReceiverOrgs: number;
   occurrences: Array<{
     Transaction_Id: string;
+    serialNo: string;
     senderOrg: string;
     receiverOrg: string;
-    amount: number;
-    timestamp: string;
+    amount: string;
+    currency: string;
+    timestamp: MongoDate;
   }>;
 }
 
@@ -131,11 +133,16 @@ export type TxSummary = {
   minProcessingTime: number
   maxProcessingTime: number
   averageONUSTransactionAmount: number
+  ONUSTotalAmount: number
   minONUSTransactionAmount: number
   maxONUSTransactionAmount: number
   averageOFFUSTransactionAmount: number
+  OFFUSTotalAmount: number
   minOFFUSTransactionAmount: number
   maxOFFUSTransactionAmount: number
+  averageTransactionAmount: number
+  minTransactionAmount: number
+  maxTransactionAmount: number
   operation: Record<Tx['operation'], number> //all operation types (redundant)
   type: Record<Tx['type'],number> // all transaction type (redundant)
   error: Record<Tx['error'], number>  //all error divisions (redundant)
