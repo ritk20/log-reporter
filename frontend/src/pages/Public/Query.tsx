@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { LoadingSpinner } from '../../components/public/Loading';
 import type { Transaction } from '../../types/data';
 
@@ -159,7 +159,7 @@ const TransactionFilters: React.FC = () => {
     await fetchFilteredData('csv');
   };
 
-  const handleFilterChange = (field: string, value: any) => {
+  const handleFilterChange = (field: string, value: string) => {
     setFilters(prev => ({
       ...prev,
       [field]: value
