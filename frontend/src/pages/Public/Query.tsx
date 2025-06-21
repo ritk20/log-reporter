@@ -105,7 +105,7 @@ const TransactionFilters: React.FC = () => {
         params.append('export_format', exportFormat);
       }
 
-      const response = await fetch(`http://localhost:8000/custom/filtered-transactions?${params}`, {
+      const response = await fetch(`http://localhost:8000/custom/filtered-transactions?${params}&token_type=access`, {
         credentials: 'include',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,

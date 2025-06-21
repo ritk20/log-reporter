@@ -37,7 +37,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
     const checkStatus = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/upload/task/${task.taskId}`, {
+        const res = await fetch(`http://localhost:8000/api/upload/task/${task.taskId}?token_type=access`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 

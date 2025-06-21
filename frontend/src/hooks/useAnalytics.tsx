@@ -48,7 +48,7 @@ export function useAnalytics(queryParams: QueryParams) {
       try {
         const token = localStorage.getItem("authToken");
         const response = await fetch(
-          `http://localhost:8000/analytics/analytics?${queryString}`, 
+          `http://localhost:8000/analytics/analytics?${queryString}&token_type=access`, 
           {
             credentials: 'include',
             headers: {
