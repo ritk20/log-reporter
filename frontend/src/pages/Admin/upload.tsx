@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useTask } from '../../hooks/useTask';
@@ -9,8 +9,33 @@ export default function Upload() {
 
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState('');
+  const [showCompletion, setShowCompletion] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Reset completion status when component mounts or when task changes
+    setShowCompletion(false);
+    
+    return () => {
+      // Cleanup when component unmounts
+      if (task?.status === 'completed') {
+        setTask({
+          taskId: null,
+          status: 'idle',
+          error: null,
+          progress: null
+        });
+      }
+    };
+  }, [task?.status, setTask]);
+
+  useEffect(() => {
+    // Show completion when task completes
+    if (task?.status === 'completed') {
+      setShowCompletion(true);
+    }
+  }, [task?.status]);
 
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== 'admin') return <Navigate to="/unauthorized" replace />;
@@ -71,12 +96,13 @@ export default function Upload() {
   };
 
   const handleViewAnalysis = () => {
+    setShowCompletion(false);
     navigate('/analytics');
   };
 
   return (
     <div className="bg-gray-50 h-screen overflow-hidden flex flex-col items-center justify-start pt-8">
-      {/* Card Container */}
+      {/* Upload Card - Always visible */}
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm mb-6">
         <h1 className="text-2xl font-bold text-center text-gray-800 mb-8">
           Logs Uploader
@@ -116,30 +142,30 @@ export default function Upload() {
         )}
       </div>
 
-      {/* Status Cards Below Upload Card */}
-      {task?.progress && (task?.status === 'uploading' || task?.status === 'processing') && (
+      {/* Progress Indicator */}
+      {(task?.status === 'uploading' || task?.status === 'processing') && (
         <div className="w-full max-w-sm bg-white rounded-xl shadow-md p-6 mb-6">
           <div className="flex items-center justify-center mb-4">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-            <span className="text-lg font-semibold text-gray-700">Processing...</span>
+            <span className="text-lg font-semibold text-gray-700">
+              {task.status === 'uploading' ? 'Uploading...' : 'Processing...'}
+            </span>
           </div>
           <div className="flex justify-between text-sm text-gray-600 mb-3">
-            <span className="font-medium">{task.progress.message}</span>
-            <span className="font-bold text-blue-600">{task.progress.current}%</span>
+            <span className="font-medium">{task.progress?.message}</span>
+            <span className="font-bold text-blue-600">{task.progress?.current}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
             <div
               className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500 ease-out shadow-sm"
-              style={{ width: `${task.progress.current}%` }}
+              style={{ width: `${task.progress?.current || 0}%` }}
             ></div>
-          </div>
-          <div className="mt-3 text-xs text-gray-500 text-center">
-            Please wait while we process your file...
           </div>
         </div>
       )}
 
-      {task?.status === 'completed' && (
+      {/* Completion Message */}
+      {showCompletion && (
         <div className="w-full max-w-sm bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-lg border border-green-200 p-6 mb-6">
           <div className="text-center">
             <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
@@ -159,6 +185,7 @@ export default function Upload() {
         </div>
       )}
 
+      {/* Error Message */}
       {task?.status === 'failed' && (
         <div className="w-full max-w-sm bg-gradient-to-br from-red-50 to-pink-50 rounded-xl shadow-lg border border-red-200 p-6 mb-6">
           <div className="text-center">

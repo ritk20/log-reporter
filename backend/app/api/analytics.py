@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pymongo import MongoClient
 from app.core.config import settings
-from app.api.analytics_service import aggregate_daily_summary, aggregate_summary_by_date_range
+from app.api.analytics_service import aggregate_daily_summary, aggregate_summary_by_date_range, aggregate_overall_summary
 from datetime import datetime, timedelta
 from app.api.auth_jwt import verify_token 
 from dateutil.relativedelta import relativedelta
@@ -36,13 +36,15 @@ overall_collection = db[settings.MONGODB_SUMM_COLLECTION_NAME]
 master_collection = db[settings.MONGODB_COLLECTION_NAME]
 
 def generate_summary_report(auth: dict = Depends(verify_token)):
-    try:
+    # try:
         date_str = aggregate_daily_summary(tempcollection, daily_collection)
-        # aggregate_overall_summary(date_str, daily_collection, overall_collection)
+        aggregate_overall_summary(daily_collection, overall_collection, date_str)
         return {"message": "Summary generated successfully", "date": date_str}
-    except Exception as e:
-        logging.error(f"Error generating summary: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+
+        
+    # except Exception as e:
+    #     logging.error(f"Error generating summary: {e}", exc_info=True)
+    #     raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/latest-date", tags=["Analytics"])
 
@@ -78,6 +80,7 @@ async def get_analytics(
                 {"_id": "overall_summary"}, 
                 {"_id": 0}
             )
+            
             if not doc:
                 raise HTTPException(status_code=404, detail="Overall summary not found")
             return parse_json(doc)

@@ -30,6 +30,7 @@ export default function AnalyticsPage() {
     // const [timeUnit, setTimeUnit] = useState<string>('hours');
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const [noDataForFilter, setNoDataForFilter] = useState(false);
 
   const [appliedFilters, setAppliedFilters] = useState<FilterType>(() => {
     const dateParam = searchParams.get('date') || 'all';
@@ -195,6 +196,9 @@ export default function AnalyticsPage() {
 
   // Apply filters and trigger data fetch
   const applyFilters = () => {
+    // Reset no data message
+    setNoDataForFilter(false);
+    
     // Validation
     if (selectedFilters.type === 'single' && !selectedFilters.startDate) {
       alert('Please select a date');
@@ -248,7 +252,17 @@ export default function AnalyticsPage() {
     setSelectedFilters(defaultFilters);
     setAppliedFilters(defaultFilters);
     setSearchParams({ date: 'all' });
+    setNoDataForFilter(false);
   };
+
+  // Check for no data condition
+  useEffect(() => {
+    if (!isLoading && !error && !data) {
+      setNoDataForFilter(true);
+    } else {
+      setNoDataForFilter(false);
+    }
+  }, [data, isLoading, error]);
 
   if (isLoading) {
     return <LoadingSpinner/>
@@ -256,10 +270,6 @@ export default function AnalyticsPage() {
 
   if (error) {
     return <div className="text-red-500 text-center p-4">Error: {error}</div>;
-  }
-
-  if (!data) {
-    return <div className="text-center p-4">No data available</div>;
   }
 
   const handleDownloadPDF = () => {
@@ -486,6 +496,18 @@ export default function AnalyticsPage() {
             </button>
           </div>
 
+          {/* No data message */}
+          {noDataForFilter && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center text-yellow-700">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <span>No data available for the selected filters</span>
+              </div>
+            </div>
+          )}
+
           {/* Current Applied Filter Display */}
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="text-sm">
@@ -501,170 +523,172 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Main Dashboard Content */}
-      <div className="space-y-8">
-        {/* KPI Cards Section */}
-        <div className="space-y-6">
-          {/* Primary KPIs Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="col-span-1 md:col-span-2">
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-all duration-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Transactions</p>
-                    <p className="text-3xl font-bold text-gray-900">{data.total}</p>
-                    {/* needs to be changed */}
-                    <p className="text-sm text-gray-500 mt-1">All time transactions</p> 
+      {/* Only show dashboard content if data exists */}
+      {!noDataForFilter && data && (
+        <div className="space-y-8">
+          {/* KPI Cards Section */}
+          <div className="space-y-6">
+            {/* Primary KPIs Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="col-span-1 md:col-span-2">
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-all duration-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total Transactions</p>
+                      <p className="text-3xl font-bold text-gray-900">{data.total}</p>
+                      {/* needs to be changed */}
+                      <p className="text-sm text-gray-500 mt-1">All time transactions</p> 
+                    </div>
+                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
                   </div>
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
+                </div>
+              </div>
+              
+              <div className="col-span-1 md:col-span-2">
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-all duration-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Success Rate</p>
+                      <p className="text-3xl font-bold text-green-600">{data.successRate}%</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {data.successRate >= 95 ? 'Excellent' : data.successRate >= 90 ? 'Good' : 'Needs attention'}
+                      </p>
+                    </div>
+                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-            
-            <div className="col-span-1 md:col-span-2">
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-all duration-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Success Rate</p>
-                    <p className="text-3xl font-bold text-green-600">{data.successRate}%</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {data.successRate >= 95 ? 'Excellent' : data.successRate >= 90 ? 'Good' : 'Needs attention'}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Statistical KPI Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <KPICard
-              title="OFFUS Transaction Amount"
-              mean={data.averageOFFUSTransactionAmount}
-              min={data.minOFFUSTransactionAmount}
-              max={data.maxOFFUSTransactionAmount}
-              unit=" Rs" //hardcoded to Rs
-              colorScheme="blue"
-            />
-            <KPICard
-              title="ONUS Transaction Amount"
-              mean={data.averageONUSTransactionAmount}
-              min={data.minONUSTransactionAmount}
-              max={data.maxONUSTransactionAmount}
-              unit=" Rs" //hardcoded to Rs
-              colorScheme="purple"
-            />
-            <KPICard
-              title="Processing Time"
-              mean={data.averageProcessingTime}
-              min={data.minProcessingTime}
-              max={data.maxProcessingTime}
-              unit="s"
-              colorScheme="green"
-            />
-          </div>
-        </div>
-
-
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-          {/* Left Column */}
-          <div className="xl:col-span-2 space-y-6 flex flex-col h-full">
-            {/* Histogram */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Transaction Amount Distribution</h3>
-              </div>
-              <div className="p-6 flex-1">
-                <div className="h-96">
-                  <Histogram 
-                    title="Transaction Amount Distribution"
-                    data={data.mergedTransactionAmountIntervals}
-                    stacked={true}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Pie Charts Row */}
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <DrillDownPieChart
-                data={data.crossTypeOp}
-                title="Transaction Types"
+            {/* Statistical KPI Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <KPICard
+                title="OFFUS Transaction Amount"
+                mean={data.averageOFFUSTransactionAmount}
+                min={data.minOFFUSTransactionAmount}
+                max={data.maxOFFUSTransactionAmount}
+                unit=" Rs" //hardcoded to Rs
                 colorScheme="blue"
               />
-              
-              <DrillDownPieChart
-                data={data.crossOpType}
-                title="Transaction Operations"
-                colorScheme='purple'
+              <KPICard
+                title="ONUS Transaction Amount"
+                mean={data.averageONUSTransactionAmount}
+                min={data.minONUSTransactionAmount}
+                max={data.maxONUSTransactionAmount}
+                unit=" Rs" //hardcoded to Rs
+                colorScheme="purple"
+              />
+              <KPICard
+                title="Processing Time"
+                mean={data.averageProcessingTime}
+                min={data.minProcessingTime}
+                max={data.maxProcessingTime}
+                unit="s"
+                colorScheme="green"
               />
             </div>
           </div>
 
-          {/* Right Column: Error Analysis */}
-          <div className="xl:col-span-1 space-y-6 flex flex-col h-full">
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm h-full flex flex-col hover:shadow-md transition-all duration-200">
-              <ErrorAnalysisCard 
-                errorData={{
-                  error: data.error,
-                  crossTypeError: data.crossTypeError ?? {},
-                  crossOpError: data.crossOpError
-                }} 
-              />
+
+          {/* Charts Grid */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+            {/* Left Column */}
+            <div className="xl:col-span-2 space-y-6 flex flex-col h-full">
+              {/* Histogram */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Transaction Amount Distribution</h3>
+                </div>
+                <div className="p-6 flex-1">
+                  <div className="h-96">
+                    <Histogram 
+                      title="Transaction Amount Distribution"
+                      data={data.mergedTransactionAmountIntervals}
+                      stacked={true}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Pie Charts Row */}
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <DrillDownPieChart
+                  data={data.crossTypeOp}
+                  title="Transaction Types"
+                  colorScheme="blue"
+                />
+                
+                <DrillDownPieChart
+                  data={data.crossOpType}
+                  title="Transaction Operations"
+                  colorScheme='purple'
+                />
+              </div>
+            </div>
+
+            {/* Right Column: Error Analysis */}
+            <div className="xl:col-span-1 space-y-6 flex flex-col h-full">
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm h-full flex flex-col hover:shadow-md transition-all duration-200">
+                <ErrorAnalysisCard 
+                  errorData={{
+                    error: data.error,
+                    crossTypeError: data.crossTypeError ?? {},
+                    crossOpError: data.crossOpError
+                  }} 
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Performance Analysis</h2>
-          </div>
-          <PerformanceDashboard
-            dateFilter={appliedFilters.type === 'all' ? 'all' : 
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Performance Analysis</h2>
+            </div>
+            <PerformanceDashboard
+              dateFilter={appliedFilters.type === 'all' ? 'all' : 
                       appliedFilters.type === 'range' ? `${appliedFilters.startDate}:${appliedFilters.endDate}` :
                       appliedFilters.type === 'relative' ? `${calculateRelativeDates(appliedFilters.relativePeriod).startDate}:${calculateRelativeDates(appliedFilters.relativePeriod).endDate}` :
-                      appliedFilters.startDate} 
-          />
-        </div>
-
-        {/* Bottom Section - Data Tables */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Duplicate Tokens Analysis</h3>
-          </div>
-          <div className="p-6">
-            <DuplicateTokensTable data={data.duplicateTokens} total={data.total}/>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
-            <TemporalDashboard
-              aggregatedData={
-                data.temporal
-                  ?? data.transactionStatsByhourInterval?.map(e => ({
-                    ...e,
-                    byType: e.byType || {},
-                    byOp: e.byOp || {},
-                    byErr: e.byErr || {}
-                  }))
-                  ?? []
-              }
-              isHourlyData={!data.temporal}
+                        appliedFilters.startDate} 
             />
-        </div>
+          </div>
 
-      </div>
+          {/* Bottom Section - Data Tables */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Duplicate Tokens Analysis</h3>
+            </div>
+            <div className="p-6">
+              <DuplicateTokensTable data={data.duplicateTokens} total={data.total}/>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+              <TemporalDashboard
+                aggregatedData={
+                  data.temporal
+                    ?? data.transactionStatsByhourInterval?.map(e => ({
+                      ...e,
+                      byType: e.byType || {},
+                      byOp: e.byOp || {},
+                      byErr: e.byErr || {}
+                    }))
+                    ?? []
+                }
+                isHourlyData={!data.temporal}
+              />
+          </div>
+
+        </div>
+      )}
     </div>
   );
 }
