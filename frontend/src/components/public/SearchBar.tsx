@@ -139,9 +139,9 @@ export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComp
       <div className="flex flex-col space-y-4">
         {/* Search Header */}
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-800">Transaction Search</h3>
+          <h3 className="text-lg font-semibold text-gray-800">Search</h3>
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">Search by:</span>
+            <span className="text-sm text-gray-600">Search For:</span>
             <select
               value={searchType}
               onChange={(e) => {
