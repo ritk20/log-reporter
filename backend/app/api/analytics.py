@@ -1,12 +1,11 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pymongo import MongoClient
+from fastapi import APIRouter, Depends, HTTPException, Query # type: ignore
+from pymongo import MongoClient # type: ignore
 from app.core.config import settings
 from app.api.analytics_service import aggregate_daily_summary, aggregate_summary_by_date_range
 from datetime import datetime, timedelta
 from app.api.auth_jwt import verify_token 
 from app.helper.convertType import parse_json
-from app.schemas.analytics import AnalyticsResponse
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 

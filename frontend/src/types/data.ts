@@ -152,4 +152,35 @@ export type TxSummary = {
   duplicateTokens: DuplicateToken[]
   temporal?: AggEntry[]
   transactionStatsByhourInterval?: AggEntry[]
+  performanceStatistics: {
+    avgProcessingTime: number;
+    maxProcessingTime: number;
+    minProcessingTime: number;
+    avgInputs: number;
+    maxInputs: number;
+    avgOutputs: number;
+    maxOutputs: number;
+    totalUniqueInputCounts: number;
+    totalUniqueOutputCounts: number;
+    mostFrequentInputCount: number;
+    mostFrequentOutputCount: number;
+  }
+  inputsBubble: {
+    x: number;
+    y: number;
+    size: number;
+    frequency: number;
+    avgProcessingTime: number;
+    minProcessingTime: number;
+    maxProcessingTime: number;
+  }[]
+  outputsBubble: {
+    x: number;
+    y: number;
+    size: number;
+    frequency: number;
+    avgProcessingTime: number;
+    minProcessingTime: number;
+    maxProcessingTime: number;
+  }[]
 }
