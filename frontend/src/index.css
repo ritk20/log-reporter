@@ -1,10 +1,4 @@
-/* index.css */
 @import "tailwindcss";
-
-/* Optional override for body just in case */
-
-
-
 
 body{
   font-family: "Merriweather Sans", sans-serif;
