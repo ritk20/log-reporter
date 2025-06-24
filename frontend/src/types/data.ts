@@ -127,6 +127,8 @@ export interface AggEntry {
 }
 
 export type TxSummary = {
+  start_time?: string // ISO date string
+  end_time?: string // ISO date string
   total: number
   successRate: number
   averageProcessingTime: number
