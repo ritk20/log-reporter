@@ -6,7 +6,7 @@ export type Tx = {
   type: TransactionType
   operation: OperationType
   error: ErrorCode
-  error_message?: string // optional, only present if error is not 'No error'
+  error_message?: string // optional, only present if error is not 'Success'
   result: TransactionResult
   SenderOrgID: string
   ReceiverOrgID: string
@@ -17,6 +17,60 @@ export type Tx = {
   number_of_inputs: number
   number_of_outputs: number
 }
+
+export interface Token {
+  tokenId: string;
+  msgId: string;
+  serialNo: string;
+  amount: string;
+  currency: string;
+  timestamp: string;
+  transactionId: string;
+  senderOrg: string;
+  receiverOrg: string;
+}
+
+// TODO: merge with Tx ASAP
+export interface Transaction {
+  Transaction_Id: string;
+  Msg_id: string;
+  Type_Of_Transaction: string;
+  Operation: string;
+  Amount: string;
+  Time_to_Transaction_secs: number;
+  Result_of_Transaction: number;
+  Request_timestamp: string;
+  Response_timestamp: string;
+  SenderOrgId: string;
+  ReceiverOrgId: string;
+  Inputs: Array<{
+    id: string;
+    serialNo: string;
+    value: string;
+    currency: string;
+    creationTimestamp: string;
+    issuerSignature: string;
+    ownerAddress: string;
+  }>;
+  Outputs: Array<{
+    value: string;
+    OutputIndex: string;
+  }>;
+  Resptokens: Array<{
+    id: string;
+    serialNo: string;
+    value: string;
+    currency: string;
+    creationTimestamp: string;
+    issuerSignature: string;
+    ownerAddress: string;
+  }>;
+  ErrorCode: string;
+  ErrorMsg: string;
+  NumberOfInputs: number;
+  NumberOfOutputs: number;
+}
+
 
 export interface AmountInterval {
   interval: string;
@@ -44,7 +98,7 @@ export interface TransactionStats {
 
 export interface DuplicateToken {
   tokenId: string;
-  count?: number;
+  count: number;
   firstSeen?: string;
   lastSeen?: string;
   totalAmount?: number;
@@ -74,33 +128,24 @@ export type TxSummary = {
   total: number
   successRate: number
   averageProcessingTime: number
-  stdevProcessingTime: number
   minProcessingTime: number
   maxProcessingTime: number
-  percentile25ProcessingTime: number
-  percentile50ProcessingTime: number
-  percentile75ProcessingTime: number
-  averageTransactionAmount: number
-  stdevTransactionAmount: number
-  minTransactionAmount: number
-  maxTransactionAmount: number
-  percentile25TransactionAmount: number
-  percentile50TransactionAmount: number
-  percentile75TransactionAmount: number
-  successes: Record<Tx['type'], Record<Tx['operation'], number>>  //successful type-op
-  failures: Record<Tx['type'], Record<Tx['operation'], number>> //failed type-op
+  averageONUSTransactionAmount: number
+  minONUSTransactionAmount: number
+  maxONUSTransactionAmount: number
+  averageOFFUSTransactionAmount: number
+  minOFFUSTransactionAmount: number
+  maxOFFUSTransactionAmount: number
   operation: Record<Tx['operation'], number> //all operation types (redundant)
   type: Record<Tx['type'],number> // all transaction type (redundant)
   error: Record<Tx['error'], number>  //all error divisions (redundant)
 
-  crossTypeOp?: Record<Tx['type'], Record<Tx['operation'], number>>  //redundant
-  crossTypeError?: Record<Tx['type'], Record<Tx['error'], number>> //redundant
-  crossOpError?: Record<Tx['operation'], Record<Tx['error'], number>>  //redundant
-  amountDistribution: Array<{ x: number; y: number; type?: Tx['type'] }>
+  crossTypeOp: Record<Tx['type'], Record<Tx['operation'], number>>
+  crossOpType: Record<Tx['operation'], Record<Tx['type'], number>>
+  crossTypeError: Record<Tx['type'], Record<Tx['error'], number>> //redundant
+  crossOpError: Record<Tx['operation'], Record<Tx['error'], number>>  //redundant
   mergedTransactionAmountIntervals: AmountInterval[]
-  processingTimeByInputs: Array<{ x: number; y: number }>
-  processingTimeByOutputs: Array<{ x: number; y: number }>
   duplicateTokens: DuplicateToken[]
   temporal?: AggEntry[]
-    transactionStatsByhourInterval: AggEntry[]
+  transactionStatsByhourInterval?: AggEntry[]
 }

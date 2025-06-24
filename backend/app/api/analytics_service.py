@@ -5,7 +5,12 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from app.database.database import get_temptoken_collection
 from pymongo.collection import Collection
+from bson import json_util
+import json
 
+def serialize_mongodb(obj):
+    """Custom serializer for MongoDB objects"""
+    return json.loads(json_util.dumps(obj))
 
 def get_type_counts(collection: Collection):
     pipeline = [{"$group": {"_id": "$Type_Of_Transaction", "count": {"$sum": 1}}}]
@@ -28,10 +33,10 @@ def get_error_counts(collection: Collection):
     results = list(collection.aggregate(pipeline))
     return {res["_id"]: res["count"] for res in results if res["_id"]}
 def get_error_docs_excluding_noerror(collection: Collection):
-    # Retrieve documents for all error codes except "noerror"
+    # Retrieve documents for all error codes except "success"
     pipeline = [
         {
-            "$match": {"ErrorCode": {"$ne": "No error"}}  # Exclude "noerror"
+            "$match": {"ErrorCode": {"$ne": "Success"}}  # Exclude "success"
         }
     ]
     # Perform the aggregation to fetch documents
@@ -128,9 +133,7 @@ def get_amount_buckets(collection: Collection, n_intervals=10):
 
     success_rate = total_success / total_transactions if total_transactions else 0
 
-    return bucket_docs, total_transactions, success_rate
-
-
+    return bucket_docs, total_transactions, success_rate, avg_processing_time
 
 def get_cross_type_operation(collection: Collection):
     pipeline = [{"$group": {"_id": {"type": "$Type_Of_Transaction", "operation": "$Operation"}, "count": {"$sum": 1}}}]
@@ -141,6 +144,17 @@ def get_cross_type_operation(collection: Collection):
         o = r["_id"].get("operation", "UNKNOWN")
         cross[t][o] = r["count"]
     return cross
+def  get_cross_operation_type(collection: Collection):
+    pipeline = [{"$group": {"_id": {"operation": "$Operation", "type": "$Type_Of_Transaction"}, "count": {"$sum": 1}}}]
+    results = list(collection.aggregate(pipeline))
+    cross = defaultdict(dict)
+    for r in results:
+        o = r["_id"].get("operation", "UNKNOWN")
+        t = r["_id"].get("type", "UNKNOWN")
+        cross[o][t] = r["count"]
+    return cross
+
+
 def  get_cross_operation_type(collection: Collection):
     pipeline = [{"$group": {"_id": {"operation": "$Operation", "type": "$Type_Of_Transaction"}, "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
@@ -229,9 +243,10 @@ def get_hour_interval_stats(collection: Collection):
         if err_code.lower() != "no error":
             buckets[bucket_start]["error_count"] += 1
         buckets[bucket_start]["total_amount"] += doc["input_amount"]
+
         buckets[bucket_start]["total_time"] += doc["Time_to_Transaction_secs"]
-        # Update the transaction count by type
-        typ = doc.get("Type_Of_Transaction", "UNKNOWN").upper()  # Ensure we handle case insensitivity
+
+        typ = doc.get("Type_Of_Transaction", "UNKNOWN").upper() 
         if typ in buckets[bucket_start]["byType"]:
             buckets[bucket_start]["byType"][typ] += 1
         op = doc.get("Operation", "UNKNOWN").upper()  # Ensure we handle case insensitivity
@@ -242,9 +257,6 @@ def get_hour_interval_stats(collection: Collection):
     for start_time in sorted(buckets.keys()):
         end_time = start_time + interval_duration
         stats = buckets[start_time]
-
-         # Calculate average processing time
-        avg_processing_time = stats["total_time"] / stats["transaction_count"] if stats["transaction_count"] > 0 else 0
         
         interval_stats.append({
             "interval_start": start_time.isoformat(),
@@ -261,20 +273,17 @@ def get_hour_interval_stats(collection: Collection):
             "byOp": stats["byOp"]
         })
     return interval_stats
-import numpy as np
 
+import numpy as np
 def r2(val):
     return round(float(val), 2)
 
-
 def compute_stats(values, prefix):
     return {
-        f"{prefix}average": r2(np.mean(values)),
-        f"{prefix}min": r2(np.min(values)),
-        f"{prefix}max": r2(np.max(values)),
+        f"average{prefix}": r2(np.mean(values)),
+        f"min{prefix}": r2(np.min(values)),
+        f"max{prefix}": r2(np.max(values)),
     }
-
-
 
 def calculate_transaction_statistics(collection):
     pipeline = [
@@ -291,9 +300,9 @@ def calculate_transaction_statistics(collection):
 
     cursor = collection.aggregate(pipeline)
 
-    processing_times = []
-    transaction_amounts = []
+    processing_times, transaction_amounts = [], []
     OnUs, OffUs = [], []
+
     for doc in cursor:
         processing_time = doc.get("processingTime")
         amount = doc.get("transactionAmount")
@@ -398,12 +407,7 @@ def aggregate_daily_summary(collection, daily_collection):
     date_key = start_time_iso[:10]
     daily_collection.update_one({"date": date_key}, {"$set": summary_doc}, upsert=True)
     logging.info(f"Daily summary updated for {date_key}")
-    return date_key
-
-
-
-
-# ---------------------------------------------------------------------------------------
+    return serialize_mongodb(date_key)# ---------------------------------------------------------------------------------------
 
 def get_temporal(daily_collection: Collection, start_date: str, end_date: str):
     # Initialize a defaultdict to store aggregated temporal data for each date
@@ -538,9 +542,9 @@ def calculate_aggregate_statistics(daily_collection: Collection, start_date: str
 
 # -------------------------------------------------------------------------------------------------------
 def aggregate_summary_by_date_range(daily_collection: Collection, start_date: str, end_date: str):    
-    # Ensure date strings are in YYYY-MM-DD format
-    start_date = start_date.strftime('%Y-%m-%d')  # Convert to string with format YYYY-MM-DD
-    end_date = end_date.strftime('%Y-%m-%d')  # Convert to string with format YYYY-MM-DD
+    # YYYY-MM-DD format
+    start_date = start_date.strftime('%Y-%m-%d')
+    end_date = end_date.strftime('%Y-%m-%d') 
     
     cursor = daily_collection.find({
         "date": {"$gte": start_date, "$lte": end_date}
@@ -555,6 +559,12 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
     total_transactions = 0
     total_success = 0
     total_processing_time = 0
+    merged_transaction_amount_intervals = defaultdict(lambda: {
+        "total": 0,
+        "load": 0,
+        "transfer": 0,
+        "redeem": 0
+    })
     cross_type_op = defaultdict(lambda: defaultdict(int))
     cross_op_type = defaultdict(lambda: defaultdict(int))
     cross_type_error = defaultdict(lambda: defaultdict(int))
@@ -624,25 +634,8 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
         for op, err_dict in summary.get("crossOpError", {}).items():
             for err, count in err_dict.items():
                 cross_op_error[op][err] += count
-        
-        # Aggregate processing time by inputs and outputs
-        for item in summary.get("processingTimeByInputs", []):
-            if item["x"] not in processing_time_by_inputs:
-                processing_time_by_inputs[item["x"]] = item["y"]
-            else:
-                processing_time_by_inputs[item["x"]]= (processing_time_by_inputs[item["x"]]+ item["y"])/2 #moving avg taken not absolute
-        for item in summary.get("processingTimeByOutputs", []):
-            if item["x"] not in processing_time_by_outputs:
-                processing_time_by_outputs[item["x"]] = item["y"]
-            else:
-                processing_time_by_outputs[item["x"]]= (processing_time_by_outputs[item["x"]]+ item["y"])/2
-# 
-# 
-# 
-# 
-# 
+
         # Iterate through each token in the duplicate_tokens list
-        
         for token in summary.get("duplicateTokens", []):
             token_id = token["tokenId"]
             

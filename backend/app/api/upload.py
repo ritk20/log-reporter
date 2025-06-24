@@ -7,14 +7,34 @@ from app.services.file_saver import save_large_upload
 from app.services.task_manager import create_task, get_task
 from app.services.zip_processor import process_zip_file
 from app.utils.thread_pool_processing import run_in_thread_pool
+from app.core.config import settings
+import re
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/upload", tags=["Upload"])
 
+FILENAME_REGEX = re.compile(settings.FILENAME_REGEX)
+
+def validate_filename(filename: str):
+    match = FILENAME_REGEX.fullmatch(filename)
+    if not match:
+        return False, "Filename must be in format transactions_YYYYMMDD.zip"
+    try:
+        datetime.strptime(match.group(1), "%Y%m%d").date()
+    except ValueError:
+        return False, "Date in filename is invalid"
+    
+    return True, None
+
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(verify_token)):
     logger.info(f"Upload request from user: {current_user.get('username', 'unknown')}")
+
+    valid, error_message = validate_filename(file.filename)
+    if not valid:
+        logger.warning(f"Validation failed: {error_message}")
+        raise HTTPException(400, error_message)
 
     if not file.filename.endswith(".zip"):
         raise HTTPException(400, "The file is not in Zip format")

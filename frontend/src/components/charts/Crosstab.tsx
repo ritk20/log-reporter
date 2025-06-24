@@ -26,5 +26,5 @@ export default function CrosstabChart({ title, data, name }: CrosstabProps) {
     })),
   };
 
-  return <EChartsReact option={option} style={{ height: 300 }} />;
+  return <EChartsReact option={option} style={{ height: 400 }} />;
 }

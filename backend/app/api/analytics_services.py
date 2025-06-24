@@ -1,9 +1,11 @@
 # app/api/analytics_service.py
-import math
+from fastapi import HTTPException
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from app.database.database import get_temptoken_collection
 from pymongo.collection import Collection
-
+import logging
+from fastapi import HTTPException
 
 def get_type_counts(collection: Collection):
     pipeline = [{"$group": {"_id": "$Type_Of_Transaction", "count": {"$sum": 1}}}]
@@ -19,10 +21,11 @@ def get_error_counts(collection: Collection):
     pipeline = [{"$group": {"_id": "$ErrorCode", "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
     return {res["_id"]: res["count"] for res in results if res["_id"]}
+
 def get_result_counts(collection: Collection):
     pipeline = [{"$group": {"_id": "$Result_of_Transaction", "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
-    counts = {}
+    counts = Counter()
     for res in results:
         key = res["_id"]
         if isinstance(key, str):
@@ -31,7 +34,7 @@ def get_result_counts(collection: Collection):
             key = "SUCCESS" if float(key) == 1 else "FAILURE"
         else:
             key = "UNKNOWN"
-        counts[key] = res["count"]
+        counts[key] += res["count"]
     return counts
 
 def get_amount_buckets(collection: Collection, n_intervals=30):
@@ -118,36 +121,29 @@ def get_amount_buckets(collection: Collection, n_intervals=30):
 def get_cross_type_operation(collection: Collection):
     pipeline = [{"$group": {"_id": {"type": "$Type_Of_Transaction", "operation": "$Operation"}, "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
-    cross = {}
+    cross = defaultdict(dict)
     for r in results:
         t = r["_id"].get("type", "UNKNOWN")
         o = r["_id"].get("operation", "UNKNOWN")
-        if t not in cross:
-            cross[t] = {}
         cross[t][o] = r["count"]
     return cross
-
 def get_cross_type_error(collection: Collection):
     pipeline = [{"$group": {"_id": {"type": "$Type_Of_Transaction", "error": "$ErrorCode"}, "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
-    cross = {}
+    cross = defaultdict(dict)
     for r in results:
         t = r["_id"].get("type", "UNKNOWN")
         e = r["_id"].get("error", "UNKNOWN")
-        if t not in cross:
-            cross[t] = {}
         cross[t][e] = r["count"]
     return cross
 
 def get_cross_operation_error(collection: Collection):
     pipeline = [{"$group": {"_id": {"operation": "$Operation", "error": "$ErrorCode"}, "count": {"$sum": 1}}}]
     results = list(collection.aggregate(pipeline))
-    cross = {}
+    cross = defaultdict(dict)
     for r in results:
         o = r["_id"].get("operation", "UNKNOWN")
         e = r["_id"].get("error", "UNKNOWN")
-        if o not in cross:
-            cross[o] = {}
         cross[o][e] = r["count"]
     return cross
 
@@ -160,8 +156,6 @@ def get_processing_time_by_outputs(collection: Collection):
     pipeline = [{"$group": {"_id": "$NumberOfOutputs", "avgTime": {"$avg": "$Time_to_Transaction_secs"}}}]
     results = list(collection.aggregate(pipeline))
     return [{"x": r["_id"], "y": r["avgTime"]} for r in results]
-
-
 def get_hour_interval_stats(collection: Collection):
     min_time_doc = collection.find_one({}, sort=[("Request_timestamp", 1)], projection={"Request_timestamp": 1})
     if not min_time_doc:
@@ -209,22 +203,84 @@ def get_hour_interval_stats(collection: Collection):
          # Calculate average processing time
         avg_processing_time = stats["total_time"] / stats["transaction_count"] if stats["transaction_count"] > 0 else 0
         
-        interval_stats.append(
-            {
+        interval_stats.append({
             "interval_start": start_time.isoformat(),
             "interval_end": end_time.isoformat(),
-            "transaction_count": stats["transaction_count"],
-            "error_count": stats["error_count"],
-            "total_amount": stats["total_amount"],
+            "count": stats["transaction_count"],
+            # "error_count": stats["error_count"],
+            "sum_amount": stats["total_amount"],
             "average_processing_time": avg_processing_time,  # Add average processing time here
             "byType": stats["byType"]
-        
-        }
-        )
+        })
     return interval_stats
+import numpy as np
 
-def aggregate_daily_summary(collection: Collection, daily_collection: Collection):
-    
+
+def r2(val):
+    return round(float(val), 2)
+
+
+def compute_stats(values, prefix):
+    return {
+        f"average{prefix}": r2(np.mean(values)),
+        f"min{prefix}": r2(np.min(values)),
+        f"max{prefix}": r2(np.max(values)),
+    }
+
+
+def calculate_transaction_statistics(collection):
+    pipeline = [
+        {
+            "$project": {
+                "processingTime": "$Time_to_Transaction_secs",
+                "transactionAmount": "$Req_Tot_Amount",
+                "senderid": "$SenderOrgId",
+                "reciverid": "$ReceiverOrgId"
+            }
+        }
+    ]
+
+    cursor = collection.aggregate(pipeline)
+
+    processing_times, transaction_amounts = [], []
+    OnUs, OffUs = [], []
+
+    for doc in cursor:
+        processing_time = doc.get("processingTime")
+        amount = doc.get("transactionAmount")
+        sender = doc.get("senderid")
+        receiver = doc.get("reciverid")
+
+        if processing_time is not None:
+            processing_times.append(processing_time)
+        if amount is not None:
+            transaction_amounts.append(amount)
+            if sender is not None and receiver is not None:
+                if sender == receiver:
+                    OnUs.append(amount)
+                else:
+                    OffUs.append(amount)
+
+    stats = {}
+    stats.update(compute_stats(processing_times, "processingTime")) if processing_times else \
+        stats.update({k: 0 for k in compute_stats([0], "processingTime").keys()})
+
+    stats.update(compute_stats(transaction_amounts, "transactionAmount")) if transaction_amounts else \
+        stats.update({k: 0 for k in compute_stats([0], "transactionAmount").keys()})
+
+    stats.update(compute_stats(OnUs, "ONUSTransactionAmount")) if OnUs else \
+        stats.update({k: 0 for k in compute_stats([0], "ONUSTransactionAmount").keys()})
+
+    stats.update(compute_stats(OffUs, "OFFUSTransactionAmount")) if OffUs else \
+        stats.update({k: 0 for k in compute_stats([0], "OFFUSTransactionAmount").keys()})
+
+    stats["ONUSTotalAmount"] = r2(sum(OnUs))
+    stats["OFFUSTotalAmount"] = r2(sum(OffUs))
+    return stats
+
+
+def aggregate_daily_summary(collection, daily_collection):
+    # Assume helper functions are defined elsewhere: get_type_counts, get_operation_counts, etc.
     type_counts = get_type_counts(collection)
     operation_counts = get_operation_counts(collection)
     error_counts = get_error_counts(collection)
@@ -235,24 +291,31 @@ def aggregate_daily_summary(collection: Collection, daily_collection: Collection
     cross_op_error = get_cross_operation_error(collection)
     processing_time_by_inputs = get_processing_time_by_inputs(collection)
     processing_time_by_outputs = get_processing_time_by_outputs(collection)
-    interval_stats = get_hour_interval_stats(collection)
-    
-    # Get min and max Request_timestamp directly (assumed always valid ISO datetime or datetime obj)
-    minmax_time_result = list(collection.aggregate([
-        {
-            "$group": {
-                "_id": None,
-                "minTime": {"$min": "$Request_timestamp"},
-                "maxTime": {"$max": "$Request_timestamp"},
-            }
+    interval_stats = get_5min_interval_stats(collection)
+    transaction_stats = calculate_transaction_statistics(collection)
+
+    minmax_time_result = list(collection.aggregate([{
+        "$group": {
+            "_id": None,
+            "minTime": {"$min": "$Request_timestamp"},
+            "maxTime": {"$max": "$Request_timestamp"},
         }
-    ]))
+    }]))
+
+    if not minmax_time_result:
+        logging.warning("No data found in collection for aggregation")
+        raise HTTPException(status_code=404, detail="No data available for daily summary")
+
     min_time_val = minmax_time_result[0]["minTime"]
     max_time_val = minmax_time_result[0]["maxTime"]
-    start_time_iso = min_time_val.isoformat() if hasattr(min_time_val, "isoformat") else min_time_val
-    end_time_iso = max_time_val.isoformat() if hasattr(max_time_val, "isoformat") else max_time_val
+    start_time_iso = min_time_val.isoformat() if hasattr(min_time_val, "isoformat") else str(min_time_val)
+    end_time_iso = max_time_val.isoformat() if hasattr(max_time_val, "isoformat") else str(max_time_val)
+
+    temp_token_coll = get_temptoken_collection()
+    duplicate_tokens = list(temp_token_coll.find({}, {'_id': 0}))
 
     summary_doc = {
+        "date": start_time_iso[:10],
         "start_time": start_time_iso,
         "end_time": end_time_iso,
         "summary": {
@@ -269,118 +332,75 @@ def aggregate_daily_summary(collection: Collection, daily_collection: Collection
             "crossOpError": cross_op_error,
             "processingTimeByInputs": processing_time_by_inputs,
             "processingTimeByOutputs": processing_time_by_outputs,
-            "transactionStatsByhourInterval": interval_stats,
+            "transactionStatsBy5MinInterval": interval_stats,
+            "duplicateTokens": duplicate_tokens,
+            **transaction_stats
         }
     }
 
-    daily_collection.update_one(
-        {"date": start_time_iso[:10]},
-        {"$set": summary_doc},
-        upsert=True
-    )
-    return 
-def aggregate_overall_summary(daily_collection: Collection, overall_collection: Collection):
-    # Fetch the existing overall summary from the overall_collection
-    existing_overall_summary = overall_collection.find_one({"_id": "overall_summary"})
-    
-    # If the document exists, extract the previous summary values, otherwise initialize them
-    if existing_overall_summary:
-        # Use the existing values from the database
-        overall_type = existing_overall_summary.get("type", {})
-        overall_operation = existing_overall_summary.get("operation", {})
-        overall_error = existing_overall_summary.get("error", {})
-        overall_result = existing_overall_summary.get("result", {})
-        overall_total = existing_overall_summary.get("total", 0)
-        overall_success_rate_sum = existing_overall_summary.get("successRate", 0) * existing_overall_summary.get("count_days", 0)
-        overall_avg_processing_time_sum = existing_overall_summary.get("averageProcessingTime", 0) * existing_overall_summary.get("count_days", 0)
-        count_days = existing_overall_summary.get("count_days", 0)
-        overall_cross_type_op = existing_overall_summary.get("crossTypeOp", {})
-        overall_cross_type_error = existing_overall_summary.get("crossTypeError", {})
-        overall_cross_op_error = existing_overall_summary.get("crossOpError", {})
-        overall_processing_time_by_inputs = existing_overall_summary.get("processingTimeByInputs", {})
-        overall_processing_time_by_outputs = existing_overall_summary.get("processingTimeByOutputs", {})
-    else:
-        # If no existing summary, initialize the values to default (empty or 0)
-        overall_type = {}
-        overall_operation = {}
-        overall_error = {}
-        overall_result = {}
-        overall_total = 0
-        overall_success_rate_sum = 0
-        overall_avg_processing_time_sum = 0
-        count_days = 0
-        overall_cross_type_op = {}
-        overall_cross_type_error = {}
-        overall_cross_op_error = {}
-        overall_processing_time_by_inputs = {}
-        overall_processing_time_by_outputs = {}
+    date_key = start_time_iso[:10]
+    daily_collection.update_one({"date": date_key}, {"$set": summary_doc}, upsert=True)
+    logging.info(f"Daily summary updated for {date_key}")
+    return date_key
 
-    # Fetch all documents from daily_collection and update the values
-    cursor = daily_collection.find()
 
-    for doc in cursor:
-        summary = doc.get("summary", {})
-        count_days += 1
-        overall_total += summary.get("total", 0)
-        overall_success_rate_sum += summary.get("successRate", 0)
-        overall_avg_processing_time_sum += summary.get("averageProcessingTime", 0)
+def aggregate_overall_summary(date_str: str, daily_collection, overall_collection):
+    daily_doc = daily_collection.find_one({"date": date_str})
+    if not daily_doc:
+        logging.warning(f"No daily summary found for {date_str}")
+        raise HTTPException(status_code=404, detail=f"No daily summary found for {date_str}")
 
-        # Update counts for type, operation, error, and result
-        for d in summary.get("type", []):
-            overall_type[d[0]] = overall_type.get(d[0], 0) + d[1]
-        for d in summary.get("operation", []):
-            overall_operation[d[0]] = overall_operation.get(d[0], 0) + d[1]
-        for d in summary.get("error", []):
-            overall_error[d[0]] = overall_error.get(d[0], 0) + d[1]
-        for d in summary.get("result", []):
-            overall_result[d[0]] = overall_result.get(d[0], 0) + d[1]
+    daily_summary = daily_doc.get("summary", {})
 
-        # Update cross-type operations, cross-type errors, and cross-operation errors
-        for t, op_dict in summary.get("crossTypeOp", {}).items():
-            for op, cnt in op_dict.items():
-                overall_cross_type_op.setdefault(t, {})[op] = overall_cross_type_op.get(t, {}).get(op, 0) + cnt
-        for t, err_dict in summary.get("crossTypeError", {}).items():
-            for err, cnt in err_dict.items():
-                overall_cross_type_error.setdefault(t, {})[err] = overall_cross_type_error.get(t, {}).get(err, 0) + cnt
-        for op, err_dict in summary.get("crossOpError", {}).items():
-            for err, cnt in err_dict.items():
-                overall_cross_op_error.setdefault(op, {})[err] = overall_cross_op_error.get(op, {}).get(err, 0) + cnt
-
-        # Update processing times by inputs and outputs
-        for item in summary.get("processingTimeByInputs", []):
-            overall_processing_time_by_inputs.setdefault(item["x"], []).append(item["y"])
-        for item in summary.get("processingTimeByOutputs", []):
-            overall_processing_time_by_outputs.setdefault(item["x"], []).append(item["y"])
-
-    # Calculate the averages for the processed times
-    avg_processing_by_inputs = [{"x": k, "y": sum(v) / len(v)} for k, v in overall_processing_time_by_inputs.items()]
-    avg_processing_by_outputs = [{"x": k, "y": sum(v) / len(v)} for k, v in overall_processing_time_by_outputs.items()]
-
-    # Calculate the average success rate and average processing time
-    overall_success_rate = (overall_success_rate_sum / count_days) if count_days else 0
-    overall_avg_processing_time = (overall_avg_processing_time_sum / count_days) if count_days else 0
-
-    # Create the updated overall summary document
-    overall_summary_doc = {
-        "type": [{"type": k, "count": v} for k, v in overall_type.items()],
-        "operation": [{"operation": k, "count": v} for k, v in overall_operation.items()],
-        "error": [{"error": k, "count": v} for k, v in overall_error.items()],
-        "result": [{"result": k, "count": v} for k, v in overall_result.items()],
-        "total": overall_total,
-        "successRate": overall_success_rate,
-        "averageProcessingTime": overall_avg_processing_time,
-        "crossTypeOp": overall_cross_type_op,
-        "crossTypeError": overall_cross_type_error,
-        "crossOpError": overall_cross_op_error,
-        "processingTimeByInputs": avg_processing_by_inputs,
-        "processingTimeByOutputs": avg_processing_by_outputs,
-        "count_days": count_days  # Save the number of days processed
+    overall_doc = overall_collection.find_one({"_id": "overall_summary"}) or {
+        "type": {}, "operation": {}, "error": {}, "result": {},
+        "count_days": 0, "successRate": 0.0, "averageProcessingTime": 0.0,
+        "transactionStats": {k: 0.0 for k in compute_stats([0], "transactionAmount_").keys() | compute_stats([0], "processingTime_").keys() | compute_stats([0], "transactionAmount_ONUS_").keys() | compute_stats([0], "transactionAmount_OFFUS_").keys()}
     }
 
-    # Update the overall summary document in the overall collection
-    overall_collection.update_one(
-        {"_id": "overall_summary"},
-        {"$set": overall_summary_doc},
-        upsert=True
-    )
-    return overall_summary_doc
+    overall_type = Counter(overall_doc.get("type", {}))
+    overall_operation = Counter(overall_doc.get("operation", {}))
+    overall_error = Counter(overall_doc.get("error", {}))
+    overall_result = Counter(overall_doc.get("result", {}))
+
+    overall_type.update(daily_summary.get("type", {}))
+    overall_operation.update(daily_summary.get("operation", {}))
+    overall_error.update(daily_summary.get("error", {}))
+    overall_result.update(daily_summary.get("result", {}))
+
+    count_days = overall_doc.get("count_days", 0) + 1
+    success_rate_sum = overall_doc.get("successRate", 0) * overall_doc.get("count_days", 0)
+    avg_time_sum = overall_doc.get("averageProcessingTime", 0) * overall_doc.get("count_days", 0)
+
+    overall_stats = overall_doc.get("transactionStats", {})
+    new_stats = {}
+    for stat in overall_stats:
+        prev_sum = overall_stats.get(stat, 0) * overall_doc.get("count_days", 0)
+        new_val = daily_summary.get(stat, 0)
+        new_stats[stat] = r2((prev_sum + new_val) / count_days)
+
+    updated_doc = {
+        "_id": "overall_summary",
+        "type": dict(overall_type),
+        "operation": dict(overall_operation),
+        "error": dict(overall_error),
+        "result": dict(overall_result),
+        "count_days": count_days,
+        "successRate": r2((success_rate_sum + daily_summary.get("successRate", 0)) / count_days),
+        "averageProcessingTime": r2((avg_time_sum + daily_summary.get("averageProcessingTime", 0)) / count_days),
+        "transactionStats": new_stats,
+        "totalAmount_ONUS": daily_summary.get("totalAmount_ONUS", 0),
+        "totalAmount_OFFUS": daily_summary.get("totalAmount_OFFUS", 0),
+        "last_updated": date_str
+    }
+
+    for field in [
+        "mergedTransactionAmountIntervals", "total", "crossTypeOp", "crossTypeError",
+        "crossOpError", "processingTimeByInputs", "processingTimeByOutputs",
+        "transactionStatsBy5MinInterval", "duplicateTokens"
+    ]:
+        if field in daily_summary:
+            updated_doc[field] = daily_summary[field]
+
+    overall_collection.update_one({"_id": "overall_summary"}, {"$set": updated_doc}, upsert=True)
+    logging.info(f"Overall summary updated for date {date_str} with transactionStats: {new_stats}")

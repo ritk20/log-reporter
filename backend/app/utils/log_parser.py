@@ -41,11 +41,11 @@ def extract_result(text):
 
 def extract_result_2(text):
     match = re.search(r'<Resp reqMsgId="[^"]+" result="[^"]+" errCode="([^"]+)"', text)
-    return match.group(1) if match else "No error"
+    return match.group(1) if match else "Success"
 
 def extract_result_3(text):
     match = re.search(r'<Resp reqMsgId="[^"]+" result="[^"]+" errCode="[^"]+" msg="([^"]+)"', text)
-    return match.group(1) if match else "No error"
+    return match.group(1) if match else "Success"
 
 def extract_amount(text):
     match = re.search(r'<Amount value="([^"]+)" curr="([^"]+)">', text)
