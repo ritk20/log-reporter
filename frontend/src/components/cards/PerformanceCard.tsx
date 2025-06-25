@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react';
 import PerformanceBubbleChart from '../charts/BubbleChart';
-import { LoadingSpinner } from '../public/Loading';
 
 export interface BubbleDataPoint {
   x: number;
@@ -12,84 +10,33 @@ export interface BubbleDataPoint {
   maxProcessingTime: number;
 }
 
-interface PerformanceData {
-  inputsBubble: BubbleDataPoint[];
-  outputsBubble: BubbleDataPoint[];
-  statistics: {
-    avgProcessingTime: number;
-    maxProcessingTime: number;
-    minProcessingTime: number;
-    avgInputs: number;
-    maxInputs: number;
-    avgOutputs: number;
-    maxOutputs: number;
-    totalUniqueInputCounts: number;
-    totalUniqueOutputCounts: number;
-    mostFrequentInputCount: number;
-    mostFrequentOutputCount: number;
-  };
-  totalTransactions: number;
+interface PerformanceStatistics {
+  avgProcessingTime: number;
+  maxProcessingTime: number;
+  minProcessingTime: number;
+  avgInputs: number;
+  maxInputs: number;
+  avgOutputs: number;
+  maxOutputs: number;
+  totalUniqueInputCounts: number;
+  totalUniqueOutputCounts: number;
+  mostFrequentInputCount: number;
+  mostFrequentOutputCount: number;
 }
 
 interface PerformanceDashboardProps {
-  dateFilter: string;
+  statistics: PerformanceStatistics;
+  inputsBubble: BubbleDataPoint[];
+  outputsBubble: BubbleDataPoint[];
+  totalTransactions?: number;
 }
 
-export default function PerformanceDashboard({ dateFilter }: PerformanceDashboardProps) {
-  const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export default function PerformanceDashboard({  
+  statistics, 
+  inputsBubble, 
+  outputsBubble 
+}: PerformanceDashboardProps) {
 
-  useEffect(() => {
-    fetchPerformanceData();
-  }, [dateFilter]);
-
-  const fetchPerformanceData = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `http://localhost:8000/analytics/performance-bubble?date=${dateFilter}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setPerformanceData(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch performance data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <LoadingSpinner/>
-    );
-  }
-
-  if (error || !performanceData) {
-    return (
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
-        <div className="text-center text-red-600">
-          Error loading performance data: {error || 'No data available'}
-        </div>
-      </div>
-    );
-  }
-
-  const { statistics } = performanceData;
 
   const calculateThroughput = () => {
     if (statistics.avgProcessingTime > 0) {
@@ -174,7 +121,7 @@ export default function PerformanceDashboard({ dateFilter }: PerformanceDashboar
       {/* Main Bubble Charts */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <PerformanceBubbleChart
-          data={performanceData.inputsBubble}
+          data={inputsBubble}
           title="Processing Time vs Number of Inputs"
           xAxisLabel="Number of Inputs"
           yAxisLabel="Processing Time (seconds)"
@@ -182,7 +129,7 @@ export default function PerformanceDashboard({ dateFilter }: PerformanceDashboar
         />
         
         <PerformanceBubbleChart
-          data={performanceData.outputsBubble}
+          data={outputsBubble}
           title="Processing Time vs Number of Outputs"
           xAxisLabel="Number of Outputs"
           yAxisLabel="Processing Time (seconds)"

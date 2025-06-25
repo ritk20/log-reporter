@@ -1,6 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { LoadingSpinner } from '../../components/public/Loading';
 import type { Transaction } from '../../types/data';
+
+interface NumericFilter {
+  operator: string;
+  value: string;
+}
 
 interface FilterState {
   startDate: string;
@@ -12,22 +17,10 @@ interface FilterState {
   result: string;
   senderOrgId: string;
   receiverOrgId: string;
-  amountFilter: {
-    operator: string;
-    value: string;
-  };
-  processingTimeFilter: {
-    operator: string;
-    value: string;
-  };
-  inputsFilter: {
-    operator: string;
-    value: string;
-  };
-  outputsFilter: {
-    operator: string;
-    value: string;
-  };
+  amountFilter: NumericFilter;
+  processingTimeFilter: NumericFilter;
+  inputsFilter: NumericFilter;
+  outputsFilter: NumericFilter;
 }
 
 const TransactionFilters: React.FC = () => {
@@ -71,11 +64,10 @@ const TransactionFilters: React.FC = () => {
 
   const fetchFilteredData = async (exportFormat?: string) => {
     setLoading(true);
-    setHasSearched(true);
     
     // Reset pagination to page 1 for new searches (except for CSV export)
-    const currentPage = exportFormat === 'csv' ? pagination.page : 
-                        hasSearched ? pagination.page : 1;
+    const isNewSearch = !exportFormat && !hasSearched;
+    const currentPage = exportFormat ? pagination.page : isNewSearch ? 1 : pagination.page;
 
     try {
       const params = new URLSearchParams();
@@ -113,7 +105,7 @@ const TransactionFilters: React.FC = () => {
         params.append('export_format', exportFormat);
       }
 
-      const response = await fetch(`http://localhost:8000/custom/filtered-transactions?${params}`, {
+      const response = await fetch(`http://localhost:8000/custom/filtered-transactions?${params}&token_type=access`, {
         credentials: 'include',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
@@ -137,13 +129,16 @@ const TransactionFilters: React.FC = () => {
         window.URL.revokeObjectURL(url);
       } else {
         const data = await response.json();
+        console.log(data.data)
         setFilteredData([...data.data]);
+        console.log('Filtered Data:', filteredData);
         setPagination({
           page: data.pagination?.page || 1,
           pageSize: data.pagination?.page_size || 10,
           total: data.pagination?.total || 0,
           totalPages: data.pagination?.total_pages || 0
         });
+        setHasSearched(true);
       }
     } catch (error) {
       console.error('Error fetching filtered data:', error);
@@ -160,28 +155,26 @@ const TransactionFilters: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (hasSearched) {
-      fetchFilteredData();
-    }
-  }, [pagination.page, hasSearched]);
-
   const handleCsvDownload = async () => {
     await fetchFilteredData('csv');
   };
 
-  const handleFilterChange = (field: string, value: any) => {
+  const handleFilterChange = (field: string, value: string) => {
     setFilters(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  const handleNumericFilterChange = (filterType: string, field: string, value: string) => {
+  const handleNumericFilterChange = (
+    filterType: keyof Pick<FilterState, 'amountFilter' | 'processingTimeFilter' | 'inputsFilter' | 'outputsFilter'>,
+    field: keyof NumericFilter,
+    value: string
+  ) => {
     setFilters(prev => ({
       ...prev,
       [filterType]: {
-        ...prev[filterType as keyof FilterState],
+        ...prev[filterType],
         [field]: value
       }
     }));

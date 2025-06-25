@@ -66,7 +66,7 @@ export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComp
         date_filter: dateParam
       });
 
-      const response = await fetch(`http://localhost:8000${endpoint}?${params}`, {
+      const response = await fetch(`http://localhost:8000${endpoint}?${params}&token_type=access`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

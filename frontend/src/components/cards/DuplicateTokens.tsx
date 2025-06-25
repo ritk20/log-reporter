@@ -19,15 +19,6 @@ export default function DuplicateTokensTable({ data, total }: DuplicateTokensTab
     setExpanded(prev => ({ ...prev, [tokenId]: !prev[tokenId] }));
   };
 
-  const handleSort = (field: typeof sortBy) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('desc');
-    }
-  };
-
   // Filter and sort data
   const filteredData = data.filter(token => 
     token.tokenId.toLowerCase().includes(searchTerm.toLowerCase())
@@ -45,12 +36,12 @@ export default function DuplicateTokensTable({ data, total }: DuplicateTokensTab
         bVal = b.totalAmount || 0;
         break;
       case 'firstSeen':
-        aVal = new Date(a.firstSeen || '').getTime();
-        bVal = new Date(b.firstSeen || '').getTime();
+        aVal = new Date(a.firstSeen.$date || '').getTime();
+        bVal = new Date(b.firstSeen.$date || '').getTime();
         break;
       case 'lastSeen':
-        aVal = new Date(a.lastSeen || '').getTime();
-        bVal = new Date(b.lastSeen || '').getTime();
+        aVal = new Date(a.lastSeen.$date || '').getTime();
+        bVal = new Date(b.lastSeen.$date || '').getTime();
         break;
       default:
         return 0;
@@ -189,13 +180,13 @@ export default function DuplicateTokensTable({ data, total }: DuplicateTokensTab
                 <div>
                   <span className="text-gray-500">First Seen:</span>
                   <span className="ml-2 text-gray-900">
-                    {dt.firstSeen ? new Date(dt.firstSeen).toLocaleString() : 'Unknown'}
+                    {new Date(dt.firstSeen.$date).toLocaleString()}
                   </span>
                 </div>
                 <div>
                   <span className="text-gray-500">Last Seen:</span>
                   <span className="ml-2 text-gray-900">
-                    {dt.lastSeen ? new Date(dt.lastSeen).toLocaleString() : 'Unknown'}
+                    {new Date(dt.lastSeen.$date).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -212,7 +203,11 @@ export default function DuplicateTokensTable({ data, total }: DuplicateTokensTab
                   <div className="space-y-3">
                     {dt.occurrences.map((occ, index) => (
                       <div key={index} className="bg-white rounded-lg border border-gray-200 p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-[minmax(120px,2fr)_minmax(120px,2fr)_minmax(80px,1fr)_minmax(80px,1fr)_minmax(80px,1fr)_minmax(120px,2fr)] gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-500 font-medium">Serial No.:</span>
+                            <p className="font-mono text-purple-600 mt-1">{occ.serialNo || index + 1}</p>
+                          </div>
                           <div>
                             <span className="text-gray-500 font-medium">Transaction:</span>
                             <p className="font-mono text-blue-600 hover:text-blue-800 cursor-pointer mt-1">
@@ -229,12 +224,12 @@ export default function DuplicateTokensTable({ data, total }: DuplicateTokensTab
                           </div>
                           <div>
                             <span className="text-gray-500 font-medium">Amount:</span>
-                            <p className="font-semibold text-green-600 mt-1">{occ.amount.toFixed(2)}</p>
+                            <p className="font-semibold text-green-600 mt-1">{occ.amount} {occ.currency}</p>
                           </div>
                           <div>
                             <span className="text-gray-500 font-medium">When:</span>
                             <p className="text-gray-900 mt-1">
-                              {new Date(occ.timestamp).toLocaleString()}
+                              {new Date(occ.timestamp.$date).toLocaleString()}
                             </p>
                           </div>
                         </div>

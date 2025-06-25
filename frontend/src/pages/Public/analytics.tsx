@@ -31,6 +31,8 @@ export default function AnalyticsPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const [noDataForFilter, setNoDataForFilter] = useState(false);
+
   const [appliedFilters, setAppliedFilters] = useState<FilterType>(() => {
     const dateParam = searchParams.get('date') || 'all';
     const rangeParam = searchParams.get('range');
@@ -195,6 +197,8 @@ export default function AnalyticsPage() {
 
   // Apply filters and trigger data fetch
   const applyFilters = () => {
+    // In applyFilters:
+    setNoDataForFilter(false);
     // Validation
     if (selectedFilters.type === 'single' && !selectedFilters.startDate) {
       alert('Please select a date');
@@ -248,7 +252,16 @@ export default function AnalyticsPage() {
     setSelectedFilters(defaultFilters);
     setAppliedFilters(defaultFilters);
     setSearchParams({ date: 'all' });
+    setNoDataForFilter(false);
   };
+
+  useEffect(() => {
+    if (!isLoading && !error && !data) {
+      setNoDataForFilter(true);
+    } else {
+      setNoDataForFilter(false);
+    }
+  }, [data, isLoading, error]);
 
   if (isLoading) {
     return <LoadingSpinner/>
@@ -279,6 +292,7 @@ export default function AnalyticsPage() {
       }
     }, 1000);
   };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* Dashboard Header */}
@@ -486,6 +500,17 @@ export default function AnalyticsPage() {
             </button>
           </div>
 
+          {noDataForFilter && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center text-yellow-700">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <span>No data available for the selected filters</span>
+              </div>
+            </div>
+          )}
+
           {/* Current Applied Filter Display */}
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="text-sm">
@@ -550,6 +575,7 @@ export default function AnalyticsPage() {
             <KPICard
               title="OFFUS Transaction Amount"
               mean={data.averageOFFUSTransactionAmount}
+              total={data.OFFUSTotalAmount}
               min={data.minOFFUSTransactionAmount}
               max={data.maxOFFUSTransactionAmount}
               unit=" Rs" //hardcoded to Rs
@@ -558,16 +584,18 @@ export default function AnalyticsPage() {
             <KPICard
               title="ONUS Transaction Amount"
               mean={data.averageONUSTransactionAmount}
+              total={data.ONUSTotalAmount}
               min={data.minONUSTransactionAmount}
               max={data.maxONUSTransactionAmount}
               unit=" Rs" //hardcoded to Rs
               colorScheme="purple"
             />
             <KPICard
-              title="Processing Time"
-              mean={data.averageProcessingTime}
-              min={data.minProcessingTime}
-              max={data.maxProcessingTime}
+              title="Total Transaction Amount"
+              mean={data.averageOFFUSTransactionAmount + data.averageONUSTransactionAmount}
+              total={data.ONUSTotalAmount + data.OFFUSTotalAmount}
+              min={Math.min(data.minONUSTransactionAmount, data.minOFFUSTransactionAmount)}
+              max={Math.max(data.maxONUSTransactionAmount, data.maxOFFUSTransactionAmount)}
               unit="s"
               colorScheme="green"
             />
@@ -631,10 +659,9 @@ export default function AnalyticsPage() {
             <h2 className="text-lg font-semibold text-gray-900">Performance Analysis</h2>
           </div>
           <PerformanceDashboard
-            dateFilter={appliedFilters.type === 'all' ? 'all' : 
-                      appliedFilters.type === 'range' ? `${appliedFilters.startDate}:${appliedFilters.endDate}` :
-                      appliedFilters.type === 'relative' ? `${calculateRelativeDates(appliedFilters.relativePeriod).startDate}:${calculateRelativeDates(appliedFilters.relativePeriod).endDate}` :
-                      appliedFilters.startDate} 
+            statistics={data.performanceStatistics}
+            inputsBubble={data.inputsBubble}
+            outputsBubble={data.outputsBubble}
           />
         </div>
 
@@ -654,9 +681,10 @@ export default function AnalyticsPage() {
                 data.temporal
                   ?? data.transactionStatsByhourInterval?.map(e => ({
                     ...e,
+                    byCount: e.byCount || {},
+                    byAmount: e.byAmount || {},
                     byType: e.byType || {},
                     byOp: e.byOp || {},
-                    byErr: e.byErr || {}
                   }))
                   ?? []
               }
