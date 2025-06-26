@@ -30,6 +30,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
   // Background polling effect
   useEffect(() => {
+    if(task.status === 'idle' || task.status === 'uploading') {
+      return; // Don't poll if idle or uploading
+    }
     if (!task.taskId || task.status === 'completed' || task.status === 'failed') {
       return;
     }

@@ -31,44 +31,51 @@ export default function Upload() {
       if (!token) throw new Error('Not authenticated');
 
       setTask({
-        taskId: null,
+        taskId: "uploading",
         status: 'uploading',
         error: null,
         progress: { current: 0, total: 100, message: 'Uploading file...' }
       });
 
       const xhr = new XMLHttpRequest();
-    
+
+      xhr.open('POST', 'http://localhost:8000/api/upload/upload', true);
+      xhr.withCredentials = true;
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
       xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          const percentComplete = (e.loaded / e.total) * 100;
-          console.log(`Upload progress: ${percentComplete}%`);  
-          setTask({
-            ...task,
-            progress: { 
-            current: Math.round(percentComplete), 
-            total: 100, 
-            message: `Uploading... ${Math.round(percentComplete)}%` 
-            }
-          });
-        }
+        if (!e.lengthComputable) return;
+        const pct = Math.round((e.loaded / e.total) * 100);
+        setTask((prev) => ({
+          ...prev,
+          progress: {
+            current: pct,
+            total: 100,
+            message: `Uploading… ${pct}%`
+          }
+        }));
       });
 
-      xhr.addEventListener('load', () => {
-        if (xhr.status === 200) {
-          const data = JSON.parse(xhr.responseText);
-          setTask({
-            taskId: data.task_id,
-            status: 'processing',
-            error: null,
-            progress: { current: 0, total: 100, message: 'Starting processing...' }
-          });
-          setFile(null);
-          if (fileInputRef.current) fileInputRef.current.value = '';
-        } else {
-          throw new Error(`HTTP error! status: ${xhr.status}`);
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            setTask({
+              taskId: data.task_id,
+              status: 'processing',
+              error: null,
+              progress: { current: 0, total: 100, message: 'Starting processing…' }
+            });
+          } else {
+            setTask({
+              taskId: null,
+              status: 'failed',
+              error: `Upload failed: ${xhr.status}`,
+              progress: null
+            });
+          }
         }
-      });
+      };
 
       xhr.addEventListener('error', () => {
         throw new Error('Upload failed');
