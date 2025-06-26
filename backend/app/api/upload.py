@@ -9,6 +9,7 @@ from app.services.zip_processor import process_zip_file
 from app.utils.thread_pool_processing import run_in_thread_pool
 from app.core.config import settings
 import re
+from app.utils.performance_monitor import performance_monitor
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ def validate_filename(filename: str):
     
     return True, None
 
+@performance_monitor
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(verify_token)):
     logger.info(f"Upload request from user: {current_user.get('username', 'unknown')}")
@@ -45,8 +47,10 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
         upload_dir.mkdir(parents=True, exist_ok=True)
         save_path = upload_dir / file.filename
 
-        file_size = await save_large_upload(file, save_path)
-        logger.info(f"Received ZIP: {file.filename}, Size: {file_size} bytes")
+        # file_size = await save_large_upload(file, save_path)
+        with open(save_path, "wb") as outfile:
+            outfile.write(await file.read())
+        logger.info(f"Received ZIP: {file.filename}")
 
         create_task(task_id, current_user.get('username'))
         run_in_thread_pool(process_zip_file, task_id, str(save_path), current_user)

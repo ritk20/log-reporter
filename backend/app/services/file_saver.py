@@ -1,7 +1,7 @@
 from pathlib import Path
 from fastapi import UploadFile
 
-async def save_large_upload(upload_file: UploadFile, save_path: Path) -> int:
+async def save_large_upload(upload_file: UploadFile, save_path: Path) -> None:
     with open(save_path, "wb") as outfile:
         while True:
             chunk = await upload_file.read(1024 * 1024)  # 1 MB chunks

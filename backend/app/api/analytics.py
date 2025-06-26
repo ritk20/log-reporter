@@ -6,6 +6,7 @@ from app.api.analytics_service import aggregate_daily_summary, aggregate_summary
 from datetime import datetime, timedelta
 from app.api.auth_jwt import verify_token 
 from app.helper.convertType import parse_json
+from app.utils.performance_monitor import performance_monitor
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
@@ -16,6 +17,7 @@ daily_collection = db[settings.MONGODB_DAILY_SUMM_COLLECTION_NAME]
 overall_collection = db[settings.MONGODB_SUMM_COLLECTION_NAME]
 master_collection = db[settings.MONGODB_COLLECTION_NAME]
 
+@performance_monitor
 def generate_summary_report(auth: dict = Depends(verify_token)):
     try:
         date_str = aggregate_daily_summary(tempcollection, daily_collection)
@@ -54,17 +56,30 @@ async def get_analytics(
     try:
         # Handle all-time summary
         if date.lower() == "all":
-            doc = overall_collection.find_one(
-                {"_id": "overall_summary"}, 
-                {"_id": 0}
-            )
-            if not doc:
-                raise HTTPException(status_code=404, detail="Overall summary not found")
-            return parse_json(doc)
+            # doc = overall_collection.find_one(
+            #     {"_id": "overall_summary"}, 
+            #     {"_id": 0}
+            # )
+            # if not doc:
+            #     raise HTTPException(status_code=404, detail="Overall summary not found")
+            # return parse_json(doc)
+        
+            start_date = "2020-01-01"
+            end_date = "2030-01-01"
+            logging.info(f"Date range requested: {start_date} to {end_date}")
+            try:
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+            
+            result = aggregate_summary_by_date_range(daily_collection, start_dt, end_dt)
+            return parse_json(result)
 
         # Handle date range
         if ":" in date:
             start_date, end_date = date.split(":")
+            logging.info(f"Date range requested: {start_date} to {end_date}")
             try:
                 start_dt = datetime.strptime(start_date, "%Y-%m-%d")
                 end_dt = datetime.strptime(end_date, "%Y-%m-%d")
