@@ -14,6 +14,8 @@ interface SearchComponentProps {
   onLoadingChange?: (isLoading: boolean) => void;
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComponentProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('search') || '');
@@ -66,7 +68,7 @@ export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComp
         date_filter: dateParam
       });
 
-      const response = await fetch(`http://localhost:8000${endpoint}?${params}&token_type=access`, {
+      const response = await fetch(`${API_BASE}${endpoint}?${params}&token_type=access`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

@@ -7,6 +7,8 @@ interface QueryParams {
   relative?: string;
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 export function useAnalytics(queryParams: QueryParams) {
   const [data, setData] = useState<TxSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +50,7 @@ export function useAnalytics(queryParams: QueryParams) {
       try {
         const token = localStorage.getItem("authToken");
         const response = await fetch(
-          `http://localhost:8000/analytics/analytics?${queryString}&token_type=access`, 
+          `${API_BASE}/analytics/analytics?${queryString}&token_type=access`, 
           {
             credentials: 'include',
             headers: {

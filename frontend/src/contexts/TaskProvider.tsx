@@ -9,6 +9,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     progress: null
   };
 
+  const API_BASE = import.meta.env.VITE_API_BASE;
+
   const [task, setTaskState] = useState<TaskInfo>(initialTaskState);
 
   const [taskHistory, setTaskHistory] = useState<TaskInfo[]>([]);
@@ -37,7 +39,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
     const checkStatus = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/upload/task/${task.taskId}?token_type=access`, {
+        const res = await fetch(`${API_BASE}/api/upload/task/${task.taskId}?token_type=access`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
