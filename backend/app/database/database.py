@@ -27,7 +27,15 @@ async def connect_to_mongo():
         if not settings.MONGODB_DB_NAME:
             raise ValueError("MONGODB_DB_NAME is not set in environment variables")
 
-        client = MongoClient(settings.MONGODB_URL)
+        client = MongoClient(
+                    settings.MONGODB_URL,
+                    maxPoolSize=50,
+                    minPoolSize=10,
+                    maxIdleTimeMS=30000,
+                    waitQueueTimeoutMS=5000,
+                    connectTimeoutMS=20000,
+                    serverSelectionTimeoutMS=20000
+                )
         client.admin.command('ping')
         logger.info("MongoDB connection established successfully")
 

@@ -623,8 +623,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* Pie Charts Row */}
-
+            {/* Pie Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <DrillDownPieChart
                 data={data.crossTypeOp}
@@ -689,6 +688,8 @@ export default function AnalyticsPage() {
                   ?? []
               }
               isHourlyData={!data.temporal}
+              startDate={data.start_time}
+              endDate={data.end_time}
             />
         </div>
 

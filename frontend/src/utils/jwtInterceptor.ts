@@ -1,3 +1,5 @@
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 type RequestOptions = RequestInit & {
   headers?: HeadersInit;
   _retry?: boolean;
@@ -24,7 +26,7 @@ export async function fetchWithAuth(url: string, options: RequestOptions = {}): 
   };
 
   try {
-    const response = await fetch(`http://localhost:8000${url}`, {
+    const response = await fetch(`${API_BASE}${url}`, {
       ...options,
       headers,
       credentials: 'include',
@@ -97,7 +99,7 @@ export async function fetchWithAuth(url: string, options: RequestOptions = {}): 
 // Add refresh function
 async function refreshAccessToken(): Promise<string | null> {
   try {
-    const response = await fetch('http://localhost:8000/api/auth/refresh', {
+    const response = await fetch(`${API_BASE}/api/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
     });
