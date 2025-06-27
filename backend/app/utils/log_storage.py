@@ -10,6 +10,8 @@ import pandas as pd
 from bson import ObjectId
 import pytz
 import numpy as np
+import time
+from app.utils.performance_monitor import performance_monitor
 
 logger = logging.getLogger(__name__)
 
@@ -64,19 +66,24 @@ class LogStorageService:
         
         return log_entry
 
+    @performance_monitor
     @staticmethod
     def store_logs_batch(parsed_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
-        # Fetch collections
+        start_time = time.perf_counter()
+    
         collection = get_collection()
         tokens_collection = get_tokens_collection()
-        temp_collection = get_temp_collection()  # Get the temporary collection
+        temp_collection = get_temp_collection()
         temptoken_collection = get_temptoken_collection()
 
         # Clear temp collections
         try:
-            temp_collection.delete_many({})  # Deletes all documents in the temporary collection
+            temp_clear_start = time.perf_counter()
+            temp_collection.delete_many({})
             temptoken_collection.delete_many({})
             logger.info("Temporary collections cleared successfully.")
+            temp_clear_time = time.perf_counter() - temp_clear_start
+            print(f"Temp collection clear: {temp_clear_time:.6f} seconds")
         except Exception as e:
             logger.error(f"Error clearing temporary collection: {str(e)}")
 
@@ -91,7 +98,6 @@ class LogStorageService:
         try:
             # Initialize variables for bulk operations
             bulk_operations = []    #actual master db
-            log_insert_operations = []  # To store operations for the temp database
             duplicate_tokens = []  # Track duplicates locally
 
             # Initialize results
@@ -100,14 +106,11 @@ class LogStorageService:
             tokens_modified_count = 0
             token_write_errors = []
 
-            time_start = time.perf_counter()
+            process_raw_logs_start = time.perf_counter()
             for raw_entry in parsed_logs:
                 if not raw_entry.get('Msg_id'):
                     logger.warning("Log entry missing Msg_id, skipping")
                     continue
-
-                # Clean and convert the log entry
-                # log_entry = LogStorageService.clean_log_entry(raw_entry.copy())
                 log_entry = raw_entry
                 
                 if log_entry['Request_timestamp'] is None:
@@ -132,56 +135,43 @@ class LogStorageService:
 
                 logs_to_insert.append(log_entry)
 
-                # Add to temp database
-                # log_insert_operations.append(
-                #     UpdateOne(
-                #         {'Msg_id': log_entry['Msg_id']},
-                #         {'$set': log_entry},
-                #         upsert=True
-                #     )
-                # )
-
                 # Prepare token data for successful transactions
                 if log_entry.get('Result_of_Transaction') == 1:
                     for input_token in log_entry.get('Inputs', []):
                         token_id = input_token.get("id")
                         
-                        if not token_id:
-                            logger.warning(f"Skipping token without ID in Msg_id {log_entry['Msg_id']}")
-                            continue
-                        
-
-
-                        
-                        # Find existing token to collect duplicate info
-                        existing_token = tokens_collection.find_one({"tokenId": token_id})
-                        if existing_token:
-                            tokenIds.append(token_id)
-                        
-                        token_occurrence = {
-                        "amount": input_token.get("value", "NA"),
-                        "currency": input_token.get("currency", "NA"),
-                        "serialNo": input_token.get("serialNo", "NA"),
-                        "timestamp": log_entry['Request_timestamp'],
-                        "senderOrg": log_entry.get('SenderOrgId'),
-                        "receiverOrg": log_entry.get('ReceiverOrgId'),
-                        "Transaction_Id": log_entry['Transaction_Id'],
-                        "Msg_id": log_entry['Msg_id'],
-                        "_processed_at": log_entry['_processed_at'],
-                        "_version": 1
-                        }
-                        tokens.append(
-                            UpdateOne(
-                                {"tokenId": input_token.get("id")},
-                                {
-                                    "$setOnInsert": {"tokenId": input_token.get("id")},
-                                    "$push": {"occurrences": token_occurrence}
-                                },
-                                upsert=True
+                        if token_id:
+                            existing_token = tokens_collection.find_one({"tokenId": token_id})
+                            if existing_token:
+                                tokenIds.append(token_id)
+                            
+                            token_occurrence = {
+                            "amount": input_token.get("value", "NA"),
+                            "currency": input_token.get("currency", "NA"),
+                            "serialNo": input_token.get("serialNo", "NA"),
+                            "timestamp": log_entry['Request_timestamp'],
+                            "senderOrg": log_entry.get('SenderOrgId'),
+                            "receiverOrg": log_entry.get('ReceiverOrgId'),
+                            "Transaction_Id": log_entry['Transaction_Id'],
+                            "Msg_id": log_entry['Msg_id'],
+                            "_processed_at": log_entry['_processed_at'],
+                            "_version": 1
+                            }
+                            tokens.append(
+                                UpdateOne(
+                                    {"tokenId": input_token.get("id")},
+                                    {
+                                        "$setOnInsert": {"tokenId": input_token.get("id")},
+                                        "$push": {"occurrences": token_occurrence}
+                                    },
+                                    upsert=True
+                                )
                             )
-                        )
-            print(f"start: {time.perf_counter() - time_start}")
+            process_raw_logs_time = time.perf_counter() - process_raw_logs_start
+            print(f"Process raw logs: {process_raw_logs_time:.6f} seconds")
+
             # Insert logs
+            logs_insert_start = time.perf_counter()
             if logs_to_insert:
                 result = collection.insert_many(logs_to_insert, ordered=False)
                 logs_inserted_count = len(result.inserted_ids)
@@ -191,9 +181,12 @@ class LogStorageService:
                 temp_collection.insert_many(logs_to_insert, ordered=False)
             else:
                 logger.info("No new log entries to insert into main collection.")
+            logs_insert_time = time.perf_counter() - logs_insert_start
+            print(f"Logs insert: {logs_insert_time:.6f} seconds")
             
 
             # Bulk write tokens (tokens collection)
+            tokens_insert_start = time.perf_counter()
             if tokens:
                 token_result = tokens_collection.bulk_write(tokens, ordered=False)
                 tokens_upserted_count = token_result.upserted_count
@@ -202,14 +195,10 @@ class LogStorageService:
                 logger.info(f"Tokens bulk write: upserted={tokens_upserted_count}, modified={tokens_modified_count}, errors={len(token_write_errors)}")
             else:
                 logger.info("No token operations to perform.")
-# here adding on duplicate aftter checking 
+            tokens_insert_time = time.perf_counter() - tokens_insert_start
+            print(f"Tokens insert: {tokens_insert_time:.6f} seconds")
 
-
-
-
-
-
-
+            find_duplicates_start = time.perf_counter()
             for id in tokenIds:
                 # Find existing token to collect duplicate info
                 existing_token = tokens_collection.find_one({"tokenId": id})
@@ -224,11 +213,18 @@ class LogStorageService:
                         "totalAmount": sum(float(o.get("amount", 0)) for o in existing_token.get("occurrences", [])),
                         "occurrences": existing_token.get("occurrences", [])
                     })
+            find_duplicates_time = time.perf_counter() - find_duplicates_start
+            print(f"Find duplicates: {find_duplicates_time:.6f} seconds")
 
+            insert_temptoken_start = time.perf_counter()
             if duplicate_tokens:
                 temptoken_collection.insert_many(duplicate_tokens)
-                # logger.info(duplicate_tokens)
-                
+                logger.info(f"Inserted {len(duplicate_tokens)} duplicate token entries into temporary collection.")
+            insert_temptoken_time = time.perf_counter() - insert_temptoken_start
+            print(f"Insert temp tokens: {insert_temptoken_time:.6f} seconds")
+            total_time = time.perf_counter() - start_time
+            print(f"Total processing time: {total_time:.6f} seconds")
+
             return {
                 # "inserted": result.inserted_count,
                 # "updated": result.modified_count,

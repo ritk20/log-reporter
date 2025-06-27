@@ -23,6 +23,8 @@ interface ChartConfig {
 interface TemporalDashboardProps {
   aggregatedData: AggEntry[];
   isHourlyData?: boolean;
+  startDate?: string; // Optional start time for custom range
+  endDate?: string; // Optional end time for custom range
 }
 
 function parseIntervalStart(s: string): Date {
@@ -30,12 +32,12 @@ function parseIntervalStart(s: string): Date {
   return new Date(normalized);
 }
 
-export default function TemporalDashboard({ aggregatedData, isHourlyData = false }: TemporalDashboardProps) {
+export default function TemporalDashboard({ aggregatedData, isHourlyData = false, startDate = '', endDate = '' }: TemporalDashboardProps) {
   const [chartConfigs, setChartConfigs] = useState<ChartConfig[]>([
     {
       id: '1',
       title: 'Primary View',
-      filter: isHourlyData ? '24hrs' : '7days',
+      filter: isHourlyData ? '24hrs' : 'custom',
       customRange: {
         from: new Date().toISOString().slice(0, 10),
         to: new Date().toISOString().slice(0, 10),
@@ -51,7 +53,7 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
     const newChart: ChartConfig = {
       id: newId,
       title: `Chart ${newId}`,
-      filter: isHourlyData ? '24hrs' : '7days',
+      filter: isHourlyData ? '24hrs' : 'custom',
       customRange: {
         from: new Date().toISOString().slice(0, 10),
         to: new Date().toISOString().slice(0, 10),
@@ -88,7 +90,13 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
       // Calculate date range
       const now = new Date();
       let fromDate: Date, toDate: Date;
-      if (filter === '24hrs') {
+      if(startDate && endDate){
+        customRange.from = startDate;
+        customRange.to = endDate;
+        fromDate = new Date(customRange.from + "T00:00:00");
+        toDate = new Date(customRange.to + "T23:59:59");
+      }
+      else if (filter === '24hrs') {
         fromDate = new Date(now.getTime() - 24 * 3600e3);
         toDate = now;
       } else if (filter === '7days') {
@@ -298,7 +306,7 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
                 <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
                     {/* Time Range Controls */}
-                    {!isHourlyData && (
+                    {/* {!isHourlyData && (
                       <div className="space-y-2">
                         <h2 className="text-sm font-medium text-gray-700">Time Range</h2>
                         <select
@@ -335,7 +343,7 @@ export default function TemporalDashboard({ aggregatedData, isHourlyData = false
                           </div>
                         )}
                       </div>
-                    )}
+                    )} */}
 
                     {/* Group By Controls */}
                     <div className="space-y-2">

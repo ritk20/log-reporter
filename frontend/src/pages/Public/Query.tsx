@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { LoadingSpinner } from '../../components/public/Loading';
 import type { Transaction } from '../../types/data';
 
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 interface NumericFilter {
   operator: string;
   value: string;
@@ -105,7 +107,7 @@ const TransactionFilters: React.FC = () => {
         params.append('export_format', exportFormat);
       }
 
-      const response = await fetch(`http://localhost:8000/custom/filtered-transactions?${params}&token_type=access`, {
+      const response = await fetch(`${API_BASE}/custom/filtered-transactions?${params}&token_type=access`, {
         credentials: 'include',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,

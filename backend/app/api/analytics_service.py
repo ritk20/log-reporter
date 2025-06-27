@@ -531,12 +531,11 @@ def aggregate_daily_summary(collection, daily_collection):
 
 def get_temporal(daily_collection: Collection, start_date: str, end_date: str):
     temporal_summary = defaultdict(lambda: {
-        "count": 0,
-        "sum_amount": 0.0,
-        "byCount": defaultdict(int),
-        "byAmount": defaultdict(float),
-        "byType": defaultdict(int),
-        "byOp": defaultdict(int),
+        
+        "byCount": {"ONUS": 0, "OFFUS": 0, "TOTAL": 0},
+        "byAmount": {"ONUS": 0, "OFFUS": 0, "TOTAL": 0}, 
+        "byType": {"REDEEM": 0, "TRANSFER": 0, "LOAD": 0},
+        "byOp": {"SPLIT": 0, "MERGE": 0, "ISSUE": 0},
         # "byErr": defaultdict(int)
     })
     cursor = daily_collection.find({
@@ -553,8 +552,8 @@ def get_temporal(daily_collection: Collection, start_date: str, end_date: str):
 
     
         # Aggregate the values
-        temporal_summary[date]["count"] += count
-        temporal_summary[date]["sum_amount"] += sum_amount
+        temporal_summary[date]["byCount"]["TOTAL"] += count
+        temporal_summary[date]["byAmount"]["TOTAL"] += sum_amount
         if doc.get("ReceiverOrgId") == doc.get("SenderOrgId"):
             temporal_summary[date]["byCount"]["ONUS"] += count
             temporal_summary[date]["byAmount"]["ONUS"] += sum_amount
@@ -577,8 +576,6 @@ def get_temporal(daily_collection: Collection, start_date: str, end_date: str):
     aggregated_temporal = [
         {
             "date": date,
-            "count": temporal["count"],
-            "sum_amount": temporal["sum_amount"],
             "byCount": dict(temporal["byCount"]),
             "byAmount": dict(temporal["byAmount"]),
             "byType": dict(temporal["byType"]),

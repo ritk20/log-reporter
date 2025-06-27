@@ -2,7 +2,10 @@ import pandas as pd
 import re
 import base64
 import json
+from app.utils.performance_monitor import performance_monitor
 pd.set_option('future.no_silent_downcasting', True)
+
+@performance_monitor
 def parser_log_file_from_content(content: str):
     log_pattern = re.compile(
         r'(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\s+(?P<level>\w+)\s+(?P<module>[\w:]+(?:\{[^\}]+\})?):\s+(?P<message>.*?)(?=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z|$)',
@@ -100,6 +103,8 @@ def extract_token_details(token, is_response):
             }
             output_list.append(output_det)
         return (input_list, output_list)
+    
+@performance_monitor
 def combine_logs(logs):
     transaction = {}
     indx=1

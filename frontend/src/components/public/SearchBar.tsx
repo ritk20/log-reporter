@@ -14,6 +14,8 @@ interface SearchComponentProps {
   onLoadingChange?: (isLoading: boolean) => void;
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComponentProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('search') || '');
@@ -66,7 +68,7 @@ export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComp
         date_filter: dateParam
       });
 
-      const response = await fetch(`http://localhost:8000${endpoint}?${params}&token_type=access`, {
+      const response = await fetch(`${API_BASE}${endpoint}?${params}&token_type=access`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -139,9 +141,9 @@ export function SearchComponent({ onResultsUpdate, onLoadingChange }: SearchComp
       <div className="flex flex-col space-y-4">
         {/* Search Header */}
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-800">Transaction Search</h3>
+          <h3 className="text-lg font-semibold text-gray-800">Search</h3>
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">Search by:</span>
+            <span className="text-sm text-gray-600">Search For:</span>
             <select
               value={searchType}
               onChange={(e) => {

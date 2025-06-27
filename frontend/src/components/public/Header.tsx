@@ -2,9 +2,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useTask } from '../../hooks/useTask';
 import { useState, useEffect, useRef } from 'react';
-import dotenv from 'dotenv'
-dotenv.config();
-const backendUrl = process.env.BACKEND_URL 
+
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 export function Header() {
   const { user, logout } = useAuth();
   const { task, taskHistory, clearTask } = useTask();
@@ -39,7 +39,7 @@ export function Header() {
       const fetchLatestDate = async () => {
         try {
           const token = localStorage.getItem("authToken");
-          const res = await fetch(`${backendUrl}/analytics/latest-date?token_type=access`, {
+          const res = await fetch(`${API_BASE}/analytics/latest-date?token_type=access`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json'

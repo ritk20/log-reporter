@@ -3,6 +3,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useTask } from '../../hooks/useTask';
 
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 export default function Upload() {
   const { user } = useAuth();
   const { setTask, task } = useTask();
@@ -54,35 +56,60 @@ export default function Upload() {
       if (!token) throw new Error('Not authenticated');
 
       setTask({
-        taskId: null,
+        taskId: "uploading",
         status: 'uploading',
         error: null,
         progress: { current: 0, total: 100, message: 'Uploading file...' }
       });
 
-      const response = await fetch('http://localhost:8000/api/upload/upload?token_type=access', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
+      const xhr = new XMLHttpRequest();
+
+      xhr.open('POST', 'http://localhost:8000/api/upload/upload', true);
+      xhr.withCredentials = true;
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (!e.lengthComputable) return;
+        const pct = Math.round((e.loaded / e.total) * 100);
+        setTask((prev) => ({
+          ...prev,
+          progress: {
+            current: pct,
+            total: 100,
+            message: `Uploading… ${pct}%`
+          }
+        }));
       });
 
-      if (response.status === 401) throw new Error('Authentication failed');
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            setTask({
+              taskId: data.task_id,
+              status: 'processing',
+              error: null,
+              progress: { current: 0, total: 100, message: 'Starting processing…' }
+            });
+          } else {
+            setTask({
+              taskId: null,
+              status: 'failed',
+              error: `Upload failed: ${xhr.status}`,
+              progress: null
+            });
+          }
+        }
+      };
 
-      const data = await response.json();
+      xhr.addEventListener('error', () => {
+        throw new Error('Upload failed');
+      });
 
-      if (data.task_id) {
-        setTask({
-          taskId: data.task_id,
-          status: 'processing',
-          error: null,
-          progress: { current: 0, total: 100, message: 'Starting processing...' }
-        });
-      }
-
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      xhr.open('POST', `${API_BASE}/api/upload/upload`);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('filename', encodeURIComponent(file.name));
+      xhr.send(formData);
 
     } catch (err) {
       setMessage(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);

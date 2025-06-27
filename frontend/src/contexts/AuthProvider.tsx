@@ -10,6 +10,8 @@ interface JWTPayload {
   role: 'admin' | 'viewer';
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshAccessToken = useCallback(async (): Promise<string | null> => {
     try {
-      const response = await fetch('http://localhost:8000/api/auth/refresh', {
+      const response = await fetch(`${API_BASE}/api/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
       });
@@ -90,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       formData.append('username', email);
       formData.append('password', password);
 
-      const response = await fetch('http://localhost:8000/api/auth/login', {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         body: formData,
         credentials: 'include',
@@ -107,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         return true;
       }
-      throw new Error('Login failed');
+      else return false;
     } catch (error) {
       console.error('Login error:', error);
       return false;
@@ -115,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async (): Promise<void> => {
-    await fetch('http://localhost:8000/api/auth/logout', {
+    await fetch(`${API_BASE}/api/auth/logout`, {
       method: 'POST',
       credentials: 'include',
     });

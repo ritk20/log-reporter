@@ -35,6 +35,7 @@ daily_collection = db[settings.MONGODB_DAILY_SUMM_COLLECTION_NAME]
 overall_collection = db[settings.MONGODB_SUMM_COLLECTION_NAME]
 master_collection = db[settings.MONGODB_COLLECTION_NAME]
 
+@performance_monitor
 def generate_summary_report(auth: dict = Depends(verify_token)):
     # try:
         date_str = aggregate_daily_summary(tempcollection, daily_collection)

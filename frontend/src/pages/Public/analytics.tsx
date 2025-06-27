@@ -686,6 +686,8 @@ export default function AnalyticsPage() {
                   ?? []
               }
               isHourlyData={!data.temporal}
+              startDate={data.start_time}
+              endDate={data.end_time}
             />
         </div>
 
