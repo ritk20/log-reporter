@@ -48,7 +48,7 @@ export function useAnalytics(queryParams: QueryParams) {
       try {
         const token = localStorage.getItem("authToken");
         const response = await fetch(
-          `http://localhost:8000/analytics/analytics?${queryString}`, 
+          `http://localhost:8000/analytics/analytics?${queryString}&token_type=access`, 
           {
             credentials: 'include',
             headers: {
@@ -57,9 +57,15 @@ export function useAnalytics(queryParams: QueryParams) {
             }
           }
         );
-
+        console.log("response", response)
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        if(response.status === 404) {
+          setData(null);
+          setIsLoading(false);
+          return;
         }
 
         const jsonData = await response.json();

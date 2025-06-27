@@ -1,6 +1,7 @@
 interface KPICardProps {
   title: string;
   mean: number;
+  total: number;
   min: number;
   max: number;
   unit?: string;
@@ -9,6 +10,7 @@ interface KPICardProps {
 
 const tooltipTexts: Record<string, string> = {
   mean: "Mean (average): The sum of all values divided by the number of values, giving the central value of the data set.",
+  total: "Total: The sum of all values in the data set, representing the overall magnitude.",
   min: "Minimum: The smallest value in the data set.",
   max: "Maximum: The largest value in the data set.",
 };
@@ -54,6 +56,7 @@ const colorSchemes = {
 export default function KPICard({
   title,
   mean,
+  total,
   min,
   max,
   unit = '',
@@ -72,7 +75,8 @@ export default function KPICard({
   };
 
   const primaryMetrics = [
-    { key: "mean", label: "Mean", value: mean, isPrimary: true }
+    { key: "mean", label: "Mean", value: mean, isPrimary: true },
+    { key: "total", label: "Total", value: total, isPrimary: true }
   ];
 
   return (

@@ -1,6 +1,6 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pymongo import MongoClient
+from fastapi import APIRouter, Depends, HTTPException, Query # type: ignore
+from pymongo import MongoClient # type: ignore
 from app.core.config import settings
 from app.api.analytics_service import aggregate_daily_summary, aggregate_summary_by_date_range, aggregate_overall_summary
 from datetime import datetime, timedelta
@@ -47,7 +47,6 @@ def generate_summary_report(auth: dict = Depends(verify_token)):
     #     raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/latest-date", tags=["Analytics"])
-
 async def get_latest_date(auth : dict = Depends(verify_token)):
     """Get the date of the most recent daily summary"""
     latest_doc = daily_collection.find_one(
@@ -110,8 +109,6 @@ async def get_analytics(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Replace the existing performance-scatter endpoint in analytics.py
-
 @router.get("/performance-bubble")
 async def get_performance_bubble_data(
     date: str = Query(..., description="Date filter - YYYY-MM-DD:YYYY-MM-DD or YYYY-MM-DD"),
@@ -119,7 +116,6 @@ async def get_performance_bubble_data(
 ):
     """Get performance bubble chart data with frequency aggregation"""
     try:
-        # Build match stage for date filtering
         match_stage = {}
         if date.lower() != "all":
             if ":" in date:

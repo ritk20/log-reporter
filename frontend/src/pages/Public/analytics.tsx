@@ -30,6 +30,7 @@ export default function AnalyticsPage() {
     // const [timeUnit, setTimeUnit] = useState<string>('hours');
 
   const [searchParams, setSearchParams] = useSearchParams();
+
   const [noDataForFilter, setNoDataForFilter] = useState(false);
 
   const [appliedFilters, setAppliedFilters] = useState<FilterType>(() => {
@@ -196,9 +197,8 @@ export default function AnalyticsPage() {
 
   // Apply filters and trigger data fetch
   const applyFilters = () => {
-    // Reset no data message
+    // In applyFilters:
     setNoDataForFilter(false);
-    
     // Validation
     if (selectedFilters.type === 'single' && !selectedFilters.startDate) {
       alert('Please select a date');
@@ -255,7 +255,6 @@ export default function AnalyticsPage() {
     setNoDataForFilter(false);
   };
 
-  // Check for no data condition
   useEffect(() => {
     if (!isLoading && !error && !data) {
       setNoDataForFilter(true);
@@ -289,6 +288,7 @@ export default function AnalyticsPage() {
       }
     }, 1000);
   };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* Dashboard Header */}
@@ -496,7 +496,6 @@ export default function AnalyticsPage() {
             </button>
           </div>
 
-          {/* No data message */}
           {noDataForFilter && (
             <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <div className="flex items-center text-yellow-700">
@@ -568,34 +567,37 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* Statistical KPI Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <KPICard
-                title="OFFUS Transaction Amount"
-                mean={data.averageOFFUSTransactionAmount}
-                min={data.minOFFUSTransactionAmount}
-                max={data.maxOFFUSTransactionAmount}
-                unit=" Rs" //hardcoded to Rs
-                colorScheme="blue"
-              />
-              <KPICard
-                title="ONUS Transaction Amount"
-                mean={data.averageONUSTransactionAmount}
-                min={data.minONUSTransactionAmount}
-                max={data.maxONUSTransactionAmount}
-                unit=" Rs" //hardcoded to Rs
-                colorScheme="purple"
-              />
-              <KPICard
-                title="Processing Time"
-                mean={data.averageProcessingTime}
-                min={data.minProcessingTime}
-                max={data.maxProcessingTime}
-                unit="s"
-                colorScheme="green"
-              />
-            </div>
+          {/* Statistical KPI Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <KPICard
+              title="OFFUS Transaction Amount"
+              mean={data.averageOFFUSTransactionAmount}
+              total={data.OFFUSTotalAmount}
+              min={data.minOFFUSTransactionAmount}
+              max={data.maxOFFUSTransactionAmount}
+              unit=" Rs" //hardcoded to Rs
+              colorScheme="blue"
+            />
+            <KPICard
+              title="ONUS Transaction Amount"
+              mean={data.averageONUSTransactionAmount}
+              total={data.ONUSTotalAmount}
+              min={data.minONUSTransactionAmount}
+              max={data.maxONUSTransactionAmount}
+              unit=" Rs" //hardcoded to Rs
+              colorScheme="purple"
+            />
+            <KPICard
+              title="Total Transaction Amount"
+              mean={data.averageOFFUSTransactionAmount + data.averageONUSTransactionAmount}
+              total={data.ONUSTotalAmount + data.OFFUSTotalAmount}
+              min={Math.min(data.minONUSTransactionAmount, data.minOFFUSTransactionAmount)}
+              max={Math.max(data.maxONUSTransactionAmount, data.maxOFFUSTransactionAmount)}
+              unit="s"
+              colorScheme="green"
+            />
           </div>
+        </div>
 
 
           {/* Charts Grid */}
@@ -649,17 +651,16 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Performance Analysis</h2>
-            </div>
-            <PerformanceDashboard
-              dateFilter={appliedFilters.type === 'all' ? 'all' : 
-                      appliedFilters.type === 'range' ? `${appliedFilters.startDate}:${appliedFilters.endDate}` :
-                      appliedFilters.type === 'relative' ? `${calculateRelativeDates(appliedFilters.relativePeriod).startDate}:${calculateRelativeDates(appliedFilters.relativePeriod).endDate}` :
-                        appliedFilters.startDate} 
-            />
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Performance Analysis</h2>
           </div>
+          <PerformanceDashboard
+            statistics={data.performanceStatistics}
+            inputsBubble={data.inputsBubble}
+            outputsBubble={data.outputsBubble}
+          />
+        </div>
 
           {/* Bottom Section - Data Tables */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
@@ -671,21 +672,22 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
-              <TemporalDashboard
-                aggregatedData={
-                  data.temporal
-                    ?? data.transactionStatsByhourInterval?.map(e => ({
-                      ...e,
-                      byType: e.byType || {},
-                      byOp: e.byOp || {},
-                      byErr: e.byErr || {}
-                    }))
-                    ?? []
-                }
-                isHourlyData={!data.temporal}
-              />
-          </div>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <TemporalDashboard
+              aggregatedData={
+                data.temporal
+                  ?? data.transactionStatsByhourInterval?.map(e => ({
+                    ...e,
+                    byCount: e.byCount || {},
+                    byAmount: e.byAmount || {},
+                    byType: e.byType || {},
+                    byOp: e.byOp || {},
+                  }))
+                  ?? []
+              }
+              isHourlyData={!data.temporal}
+            />
+        </div>
 
         </div>
       )}

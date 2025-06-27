@@ -60,7 +60,7 @@ export default function Upload() {
         progress: { current: 0, total: 100, message: 'Uploading file...' }
       });
 
-      const response = await fetch('http://localhost:8000/api/upload/upload', {
+      const response = await fetch('http://localhost:8000/api/upload/upload?token_type=access', {
         method: 'POST',
         credentials: 'include',
         headers: { Authorization: `Bearer ${token}` },

@@ -11,15 +11,13 @@ export default function Search() {
     token: [] as Token[],
     transaction: [] as Transaction[],
   });
-  const [searchTotal, setSearchTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false); // Add loading state
   const [searchParams] = useSearchParams();
 
    // Track if a search has been performed
   const [hasSearched, setHasSearched] = useState(false);
-  const handleSearchResults = (results: SearchResult, total: number) => {
+  const handleSearchResults = (results: SearchResult) => {
     setSearchResults(results);
-    setSearchTotal(total);
     setHasSearched(true);
   };
 

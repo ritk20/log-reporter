@@ -7,6 +7,8 @@ from app.database.database import get_temptoken_collection
 from pymongo.collection import Collection
 from bson import json_util
 import json
+from app.helper.convertType import parse_json
+import logging
 
 def serialize_mongodb(obj):
     """Custom serializer for MongoDB objects"""
@@ -17,8 +19,8 @@ def get_type_counts(collection: Collection):
     results = list(collection.aggregate(pipeline))
     return {res["_id"]: res["count"] for res in results if res["_id"]}
 
-
-    
+def get_sum_amounts(collection: Collection):
+    pipeline = [{"$group": {"_id": None, "total_amount": {"$sum": "input_amount"}}}]
     results = list(collection.aggregate(pipeline))
 
 
@@ -80,13 +82,17 @@ def get_amount_buckets(collection: Collection, n_intervals=10):
             "total": 0,
             "LOAD": 0,
             "TRANSFER": 0,
-            "REDEEM": 0
+            "REDEEM": 0,
+            "SPLIT": 0,
+            "MERGE": 0,
+            "ISSUE": 0
         })
 
     # Now, go through the collection and count amounts per bucket
     cursor = collection.find({}, {
         "input_amount": 1,
         "Type_Of_Transaction": 1,
+        "Operation": 1,
         "Result_of_Transaction": 1,
         "Time_to_Transaction_secs": 1
     })
@@ -97,6 +103,7 @@ def get_amount_buckets(collection: Collection, n_intervals=10):
     for doc in cursor:
         amt = doc.get("input_amount", 0)
         typ = doc.get("Type_Of_Transaction", "UNKNOWN")
+        op = doc.get("Operation", "UNKNOWN")
         res_val = doc.get("Result_of_Transaction")
         if isinstance(res_val, str):
             res = res_val.upper()
@@ -117,6 +124,8 @@ def get_amount_buckets(collection: Collection, n_intervals=10):
                 bucket["total"] += 1
                 if typ in bucket:
                     bucket[typ] += 1
+                if op in bucket:
+                    bucket[op] += 1
                 break
 
     # Prepare the final list of bucket documents for returning
@@ -128,6 +137,9 @@ def get_amount_buckets(collection: Collection, n_intervals=10):
             "load": b["LOAD"],
             "transfer": b["TRANSFER"],
             "redeem": b["REDEEM"],
+            "split": b["SPLIT"],
+            "merge": b["MERGE"],
+            "issue": b["ISSUE"]
         })
 
     success_rate = total_success / total_transactions if total_transactions else 0
@@ -216,34 +228,21 @@ def get_hour_interval_stats(collection: Collection):
         if bucket_start not in buckets:
             buckets[bucket_start] = {
                 "transaction_count": 0,
-                "onuscount": 0,
-                "offuscount": 0,
-                "onusamountcount":0,
-                "offusamountcount": 0,
-                "error_count": 0,
-                "total_amount": 0,
-                "total_time": 0,
-                "byType": {"LOAD": 0, "TRANSFER": 0, "REDEEM": 0},  # Initialize the byType dictionary
-            
-                "byOp": {"MERGE": 0, "ISSUE": 0, "SPLIT": 0}  # Initialize the byOp dictionary
+                "byCount": {"ONUS": 0, "OFFUS": 0, "TOTAL": 0},
+                "byAmount": {"ONUS": 0, "OFFUS": 0, "TOTAL": 0},
+                "byType": {"LOAD": 0, "TRANSFER": 0, "REDEEM": 0},
+                "byOp": {"MERGE": 0, "ISSUE": 0, "SPLIT": 0},
             }
-        buckets[bucket_start]["transaction_count"] += 1
+
         if doc["ReceiverOrgId"]==doc["SenderOrgId"]:
-            buckets[bucket_start]["onuscount"] +=1
-            buckets[bucket_start]["onusamountcount"] +=doc["input_amount"]
+            buckets[bucket_start]["byCount"]["ONUS"] += 1
+            buckets[bucket_start]["byAmount"]["ONUS"] += doc["input_amount"]
         else:
-            buckets[bucket_start]["offuscount"] +=1
-            buckets[bucket_start]["offusamountcount"] +=doc["input_amount"]
+            buckets[bucket_start]["byCount"]["OFFUS"] += 1
+            buckets[bucket_start]["byAmount"]["OFFUS"] += doc["input_amount"]
 
-
-
-
-        err_code = doc["ErrorCode"]
-        if err_code.lower() != "no error":
-            buckets[bucket_start]["error_count"] += 1
-        buckets[bucket_start]["total_amount"] += doc["input_amount"]
-
-        buckets[bucket_start]["total_time"] += doc["Time_to_Transaction_secs"]
+        buckets[bucket_start]["byCount"]["TOTAL"] += 1
+        buckets[bucket_start]["byAmount"]["TOTAL"] += doc["input_amount"]
 
         typ = doc.get("Type_Of_Transaction", "UNKNOWN").upper() 
         if typ in buckets[bucket_start]["byType"]:
@@ -260,13 +259,8 @@ def get_hour_interval_stats(collection: Collection):
         interval_stats.append({
             "interval_start": start_time.isoformat(),
             "interval_end": end_time.isoformat(),
-            "count": stats["transaction_count"],
-            "onuscount": stats["onuscount"],
-            "offuscount": stats["offuscount"],
-            "onusamountcount":stats["onusamountcount"],
-            "offusamountcount": stats["offusamountcount"],
-            "error_count": stats["error_count"],
-            "sum_amount": stats["total_amount"],
+            "byCount": stats["byCount"],
+            "byAmount": stats["byAmount"],
             "byType": stats["byType"],
             "byOp": stats["byOp"]
         })
@@ -319,7 +313,6 @@ def calculate_transaction_statistics(collection):
 
 
     stats = {}
-
     stats.update(compute_stats(processing_times, "ProcessingTime")) if processing_times else \
         stats.update({k: 0 for k in compute_stats([0], "ProcessingTime").keys()})
 
@@ -336,6 +329,134 @@ def calculate_transaction_statistics(collection):
     stats["OFFUSTotalAmount"] = r2(sum(OffUs))
     return stats
 
+def process_bubble_data(raw_data):
+    """Process raw data for bubble charts with frequency aggregation"""
+    import numpy as np
+    from collections import defaultdict
+
+    # Aggregate data by input/output count
+    inputs_aggregation = defaultdict(lambda: {
+        'count': 0,
+        'total_processing_time': 0,
+        'processing_times': [],
+        'transactions': [],
+        'operations': defaultdict(int)
+    })
+    
+    outputs_aggregation = defaultdict(lambda: {
+        'count': 0, 
+        'total_processing_time': 0,
+        'processing_times': [],
+        'transactions': [],
+        'operations': defaultdict(int)
+    })
+
+    # Process each transaction
+    for item in raw_data:
+        processing_time = item["processingTime"]
+        num_inputs = item["numberOfInputs"] 
+        num_outputs = item["numberOfOutputs"]
+
+        # Aggregate for inputs
+        inputs_aggregation[num_inputs]['count'] += 1
+        inputs_aggregation[num_inputs]['total_processing_time'] += processing_time
+        inputs_aggregation[num_inputs]['processing_times'].append(processing_time)
+
+        # Aggregate for outputs  
+        outputs_aggregation[num_outputs]['count'] += 1
+        outputs_aggregation[num_outputs]['total_processing_time'] += processing_time
+        outputs_aggregation[num_outputs]['processing_times'].append(processing_time)
+
+    # Convert to bubble chart format
+    inputs_bubble = []
+    outputs_bubble = []
+
+    for input_count, data in inputs_aggregation.items():
+        avg_processing_time = data['total_processing_time'] / data['count']
+        processing_times = data['processing_times']
+        
+        inputs_bubble.append({
+            'x': input_count,
+            'y': avg_processing_time,
+            'size': data['count'],
+            'frequency': data['count'],
+            'avgProcessingTime': avg_processing_time,
+            'minProcessingTime': min(processing_times),
+            'maxProcessingTime': max(processing_times),
+        })
+
+    for output_count, data in outputs_aggregation.items():
+        avg_processing_time = data['total_processing_time'] / data['count']
+        processing_times = data['processing_times']
+        
+        outputs_bubble.append({
+            'x': output_count,
+            'y': avg_processing_time, 
+            'size': data['count'],
+            'frequency': data['count'],
+            'avgProcessingTime': avg_processing_time,
+            'minProcessingTime': min(processing_times),
+            'maxProcessingTime': max(processing_times)
+        })
+
+    # Calculate overall statistics
+    all_processing_times = [item["processingTime"] for item in raw_data]
+    all_input_counts = [item["numberOfInputs"] for item in raw_data]
+    all_output_counts = [item["numberOfOutputs"] for item in raw_data]
+
+    stats = {
+        'avgProcessingTime': np.mean(all_processing_times),
+        'maxProcessingTime': np.max(all_processing_times),
+        'minProcessingTime': np.min(all_processing_times),
+        'avgInputs': np.mean(all_input_counts),
+        'maxInputs': np.max(all_input_counts),
+        'avgOutputs': np.mean(all_output_counts), 
+        'maxOutputs': np.max(all_output_counts),
+        'totalUniqueInputCounts': len(inputs_aggregation),
+        'totalUniqueOutputCounts': len(outputs_aggregation),
+        'mostFrequentInputCount': max(inputs_aggregation.items(), key=lambda x: x[1]['count'])[0],
+        'mostFrequentOutputCount': max(outputs_aggregation.items(), key=lambda x: x[1]['count'])[0]
+    }
+
+    return {
+        'inputs_bubble': inputs_bubble,
+        'outputs_bubble': outputs_bubble,
+        'stats': stats
+    }
+
+def get_performance_stats(collection):
+    # Aggregation pipeline for bubble chart data
+    pipeline = [
+        {"$project": {
+            "processingTime": "$Time_to_Transaction_secs",
+            "numberOfInputs": "$NumberOfInputs", 
+            "numberOfOutputs": "$NumberOfOutputs",
+            "transactionId": "$Transaction_Id",
+            "amount": "$Amount",
+            "operation": "$Operation",
+            "type": "$Type_Of_Transaction",
+            "result": "$Result_of_Transaction"
+        }},
+        {"$match": {
+            "processingTime": {"$exists": True, "$ne": None},
+            "numberOfInputs": {"$exists": True, "$ne": None},
+            "numberOfOutputs": {"$exists": True, "$ne": None}
+        }}
+    ]
+
+    # Execute aggregation
+    raw_data = list(collection.aggregate(pipeline))
+    
+    # Process data for bubble chart
+    processed_data = process_bubble_data(raw_data)
+    processed_data = parse_json(processed_data)
+
+    return {
+        "inputsBubble": processed_data["inputs_bubble"],
+        "outputsBubble": processed_data["outputs_bubble"],
+        "performanceStatistics": processed_data["stats"]
+    }
+    
 def aggregate_daily_summary(collection, daily_collection):
     type_counts = get_type_counts(collection)
     operation_counts = get_operation_counts(collection)
@@ -351,6 +472,7 @@ def aggregate_daily_summary(collection, daily_collection):
     processing_time_by_outputs = get_processing_time_by_outputs(collection)
     interval_stats = get_hour_interval_stats(collection)
     transaction_stats = calculate_transaction_statistics(collection)
+    processing_time_stats = get_performance_stats(collection)
 
     minmax_time_result = list(collection.aggregate([
         {
@@ -375,7 +497,7 @@ def aggregate_daily_summary(collection, daily_collection):
     duplicate_tokens = list(temp_token_coll.find({}, {'_id': 0}))
 
     summary_doc = {
-        "date": start_time_iso[:10],  # Ensure consistent date key
+        "date": start_time_iso[:10],
         "start_time": start_time_iso,
         "end_time": end_time_iso,
         "summary": {
@@ -385,6 +507,7 @@ def aggregate_daily_summary(collection, daily_collection):
             "error": dict(error_counts),
             "errorDocs": error_docs,  
             "result": dict(result_counts),
+            "sumAmount":sum_amount,
             "mergedTransactionAmountIntervals": bucket_docs,
             "total": total_transactions,
             "successRate": success_rate * 100,
@@ -396,7 +519,8 @@ def aggregate_daily_summary(collection, daily_collection):
             "processingTimeByOutputs": processing_time_by_outputs,
             "transactionStatsByhourInterval": interval_stats,
             "duplicateTokens": duplicate_tokens,
-            **transaction_stats
+            **transaction_stats,
+            **processing_time_stats
         }
     }
 
@@ -406,33 +530,37 @@ def aggregate_daily_summary(collection, daily_collection):
     return serialize_mongodb(date_key)# ---------------------------------------------------------------------------------------
 
 def get_temporal(daily_collection: Collection, start_date: str, end_date: str):
-    # Initialize a defaultdict to store aggregated temporal data for each date
     temporal_summary = defaultdict(lambda: {
         "count": 0,
         "sum_amount": 0.0,
+        "byCount": defaultdict(int),
+        "byAmount": defaultdict(float),
         "byType": defaultdict(int),
         "byOp": defaultdict(int),
-        "byErr": defaultdict(int)
+        # "byErr": defaultdict(int)
     })
-    # Query to filter documents between the two dates
     cursor = daily_collection.find({
-        "date": {"$gte": start_date, "$lte": end_date}  # Filter by date (YYYY-MM-DD format)
+        "date": {"$gte": start_date, "$lte": end_date}
     })
 
-    # Aggregate the temporal data from the documents
     for doc in cursor:    
         summary = doc.get("summary", {})
         date = doc["date"]
-        count=summary.get("total", 0) #total  no of transactions in a single doc
+        count=summary.get("total", 0)
         byType=summary.get("type",{})
         byOp=summary.get("operation",{})
-        byErr=summary.get("error",{})
         sum_amount=summary.get("sum_amount", 0.0)
 
     
         # Aggregate the values
         temporal_summary[date]["count"] += count
         temporal_summary[date]["sum_amount"] += sum_amount
+        if doc.get("ReceiverOrgId") == doc.get("SenderOrgId"):
+            temporal_summary[date]["byCount"]["ONUS"] += count
+            temporal_summary[date]["byAmount"]["ONUS"] += sum_amount
+        else:
+            temporal_summary[date]["byCount"]["OFFUS"] += count
+            temporal_summary[date]["byAmount"]["OFFUS"] += sum_amount
 
         # Aggregate by type
         for type_key, type_value in byType.items():
@@ -443,17 +571,19 @@ def get_temporal(daily_collection: Collection, start_date: str, end_date: str):
             temporal_summary[date]["byOp"][op_key] += op_value
 
         # Aggregate by error
-        for err_key, err_value in byErr.items():
-            temporal_summary[date]["byErr"][err_key] += err_value
+        # for err_key, err_value in byErr.items():
+        #     temporal_summary[date]["byErr"][err_key] += err_value
 
     aggregated_temporal = [
         {
             "date": date,
             "count": temporal["count"],
             "sum_amount": temporal["sum_amount"],
+            "byCount": dict(temporal["byCount"]),
+            "byAmount": dict(temporal["byAmount"]),
             "byType": dict(temporal["byType"]),
             "byOp": dict(temporal["byOp"]),
-            "byErr": dict(temporal["byErr"])
+            # "byErr": dict(temporal["byErr"])
         }
         for date, temporal in temporal_summary.items()
     ]
@@ -471,14 +601,14 @@ from collections import defaultdict
 def calculate_aggregate_statistics(daily_collection: Collection, start_date: str, end_date: str):
     aggregate_statistics = {
         "averageProcessingTime": 0.0,
-        "minProcessingTime": float('inf'),  # Initialize to inf for min values
-        "maxProcessingTime": -float('inf'),  # Initialize to -inf for max values
-        "averageONUSTransactionAmount": 0.0,
-        "minONUSTransactionAmount": float('inf'),  # Initialize to inf for min values
-        "maxONUSTransactionAmount": -float('inf'),  # Initialize to -inf for max values
-        "averageOFFUSTransactionAmount": 0.0,
-        "minOFFUSTransactionAmount": float('inf'),  # Initialize to inf for min values
-        "maxOFFUSTransactionAmount": -float('inf'),  # Initialize to -inf for max values
+        "minProcessingTime": float('inf'),
+        "maxProcessingTime": -float('inf'),
+        "minONUSTransactionAmount": float('inf'),
+        "maxONUSTransactionAmount": -float('inf'),
+        "minOFFUSTransactionAmount": float('inf'),
+        "maxOFFUSTransactionAmount": -float('inf'),
+        "ONUSTotalAmount": 0.0,
+        "OFFUSTotalAmount": 0.0
     }
     
     counttotal = 0
@@ -493,22 +623,21 @@ def calculate_aggregate_statistics(daily_collection: Collection, start_date: str
     
     for doc in cursor:
         summary = doc.get("summary", {})
-        count = summary.get("total", 0)  # Total number of transactions in a single doc
-        averageProcessingTime = summary.get("processingTime_average", 0.0)
-        minProcessingTime = summary.get("processingTime_min", 0.0)
-        maxProcessingTime = summary.get("processingTime_max", 0.0)
-        averageONUSTransactionAmount = summary.get("transactionAmount_ONUS_average", 0.0)
-        minONUSTransactionAmount = summary.get("transactionAmount_ONUS_min", 0.0)
-        maxONUSTransactionAmount = summary.get("transactionAmount_ONUS_max", 0.0)
-        averageOFFUSTransactionAmount = summary.get("transactionAmount_OFFUS_average", 0.0)
-        minOFFUSTransactionAmount = summary.get("transactionAmount_OFFUS_min", 0.0)
-        maxOFFUSTransactionAmount = summary.get("transactionAmount_OFFUS_max", 0.0)
+        count = summary.get("total", 0) 
+        averageProcessingTime = summary.get("averageProcessingTime", 0.0)
+        minProcessingTime = summary.get("minProcessingTime", 0.0)
+        maxProcessingTime = summary.get("maxProcessingTime", 0.0)
+        minONUSTransactionAmount = summary.get("minONUSTransactionAmount", 0.0)
+        maxONUSTransactionAmount = summary.get("maxONUSTransactionAmount", 0.0)
+        minOFFUSTransactionAmount = summary.get("minOFFUSTransactionAmount", 0.0)
+        maxOFFUSTransactionAmount = summary.get("maxOFFUSTransactionAmount", 0.0)
+
+        onus_amt += summary.get("ONUSTotalAmount", 0.0)
+        offus_amt += summary.get("OFFUSTotalAmount", 0.0)
 
         # Aggregate the values
         counttotal += count
         processing_time += averageProcessingTime * count
-        onusamt += averageONUSTransactionAmount * count
-        offusamt += averageOFFUSTransactionAmount * count
         
         # Update min and max values
         aggregate_statistics["minProcessingTime"] = min(aggregate_statistics["minProcessingTime"], minProcessingTime)
@@ -519,24 +648,157 @@ def calculate_aggregate_statistics(daily_collection: Collection, start_date: str
         aggregate_statistics["maxOFFUSTransactionAmount"] = max(aggregate_statistics["maxOFFUSTransactionAmount"], maxOFFUSTransactionAmount)
 
     # Update average values after processing all documents
-    if counttotal > 0:
-        aggregate_statistics["averageProcessingTime"] = processing_time / counttotal
-        aggregate_statistics["averageONUSTransactionAmount"] = onusamt / counttotal
-        aggregate_statistics["averageOFFUSTransactionAmount"] = offusamt / counttotal
+    if count_total > 0:
+        aggregate_statistics["averageProcessingTime"] = processing_time / count_total
+        aggregate_statistics["averageONUSTransactionAmount"] = onus_amt / count_total
+        aggregate_statistics["averageOFFUSTransactionAmount"] = offus_amt / count_total
+    
+    aggregate_statistics["ONUSTotalAmount"] = onus_amt
+    aggregate_statistics["OFFUSTotalAmount"] = offus_amt
 
     return aggregate_statistics
 
+def aggregate_bubble_data(start_date, end_date, daily_collection):
+    """Aggregate inputsBubble, outputsBubble, and performanceStatistics from daily summaries in the date range"""
+    
+    # Query daily summaries in the date range
+    cursor = daily_collection.find({
+        "date": {"$gte": start_date, "$lte": end_date}
+    })
 
+    from collections import defaultdict
+    import numpy as np
+    
+    # Aggregation dictionaries for inputs and outputs
+    inputs_agg = defaultdict(lambda: {
+        'total_count': 0,
+        'total_processing_time': 0,
+        'min_processing_time': float('inf'),
+        'max_processing_time': float('-inf'),
+        'processing_times': []
+    })
+    
+    outputs_agg = defaultdict(lambda: {
+        'total_count': 0,
+        'total_processing_time': 0,
+        'min_processing_time': float('inf'),
+        'max_processing_time': float('-inf'),
+        'processing_times': []
+    })
+    
+    # Collect all data for overall statistics
+    all_processing_times = []
+    all_input_counts = []
+    all_output_counts = []
+    
+    # Process each daily summary
+    for doc in cursor:
+        summary = doc.get('summary', {})
+        # Process inputsBubble
+        for item in summary.get('inputsBubble', []):
+            x = item['x']
+            count = item['frequency']
+            avg_time = item['avgProcessingTime']
+            min_time = item['minProcessingTime']
+            max_time = item['maxProcessingTime']
+            
+            inputs_agg[x]['total_count'] += count
+            inputs_agg[x]['total_processing_time'] += avg_time * count
+            inputs_agg[x]['min_processing_time'] = min(inputs_agg[x]['min_processing_time'], min_time)
+            inputs_agg[x]['max_processing_time'] = max(inputs_agg[x]['max_processing_time'], max_time)
+            
+            # For weighted statistics calculation
+            all_input_counts.extend([x] * count)
+            all_processing_times.extend([avg_time] * count)
+        
+        # Process outputsBubble
+        for item in summary.get('outputsBubble', []):
+            x = item['x']
+            count = item['frequency']
+            avg_time = item['avgProcessingTime']
+            min_time = item['minProcessingTime']
+            max_time = item['maxProcessingTime']
+            
+            outputs_agg[x]['total_count'] += count
+            outputs_agg[x]['total_processing_time'] += avg_time * count
+            outputs_agg[x]['min_processing_time'] = min(outputs_agg[x]['min_processing_time'], min_time)
+            outputs_agg[x]['max_processing_time'] = max(outputs_agg[x]['max_processing_time'], max_time)
+            
+            # For weighted statistics calculation
+            all_output_counts.extend([x] * count)
+    
+    # Build aggregated inputsBubble
+    inputs_bubble = []
+    for x, data in inputs_agg.items():
+        if data['total_count'] > 0:
+            avg_processing_time = data['total_processing_time'] / data['total_count']
+            inputs_bubble.append({
+                'x': x,
+                'y': r2(avg_processing_time),
+                'size': data['total_count'],
+                'frequency': data['total_count'],
+                'avgProcessingTime': r2(avg_processing_time),
+                'minProcessingTime': r2(data['min_processing_time']),
+                'maxProcessingTime': r2(data['max_processing_time'])
+            })
+    
+    # Build aggregated outputsBubble
+    outputs_bubble = []
+    for x, data in outputs_agg.items():
+        if data['total_count'] > 0:
+            avg_processing_time = data['total_processing_time'] / data['total_count']
+            outputs_bubble.append({
+                'x': x,
+                'y': r2(avg_processing_time),
+                'size': data['total_count'],
+                'frequency': data['total_count'],
+                'avgProcessingTime': r2(avg_processing_time),
+                'minProcessingTime': r2(data['min_processing_time']),
+                'maxProcessingTime': r2(data['max_processing_time'])
+            })
+    
+    # Calculate overall performance statistics
+    performance_stats = {}
+    
+    if all_processing_times:
+        performance_stats.update({
+            'avgProcessingTime': r2(np.mean(all_processing_times)),
+            'maxProcessingTime': r2(np.max(all_processing_times)),
+            'minProcessingTime': r2(np.min(all_processing_times))
+        })
+    
+    if all_input_counts:
+        performance_stats.update({
+            'avgInputs': r2(np.mean(all_input_counts)),
+            'maxInputs': int(np.max(all_input_counts))
+        })
+    
+    if all_output_counts:
+        performance_stats.update({
+            'avgOutputs': r2(np.mean(all_output_counts)),
+            'maxOutputs': int(np.max(all_output_counts))
+        })
+    
+    # Additional statistics
+    performance_stats.update({
+        'totalUniqueInputCounts': len(inputs_agg),
+        'totalUniqueOutputCounts': len(outputs_agg)
+    })
+    
+    if inputs_agg:
+        most_frequent_input = max(inputs_agg.items(), key=lambda x: x[1]['total_count'])
+        performance_stats['mostFrequentInputCount'] = most_frequent_input[0]
+    
+    if outputs_agg:
+        most_frequent_output = max(outputs_agg.items(), key=lambda x: x[1]['total_count'])
+        performance_stats['mostFrequentOutputCount'] = most_frequent_output[0]
+    
+    return {
+        'inputsBubble': inputs_bubble,
+        'outputsBubble': outputs_bubble,
+        'performanceStatistics': performance_stats
+    }
 
-
-
-
-
-
-
-
-
-# -------------------------------------------------------------------------------------------------------
 def aggregate_summary_by_date_range(daily_collection: Collection, start_date: str, end_date: str):    
     # YYYY-MM-DD format
     start_date = start_date.strftime('%Y-%m-%d')
@@ -545,6 +807,13 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
     cursor = daily_collection.find({
         "date": {"$gte": start_date, "$lte": end_date}
     })
+
+    # logging.info(f"Aggregating summary from {start_date} to {end_date}, found {cursor.count()} documents")
+    count = daily_collection.count_documents({
+        "date": {"$gte": start_date, "$lte": end_date}
+    })
+    if count == 0:
+        raise HTTPException(status_code=404, detail="No data available for the specified date range")
 
     # Initialize the aggregation variables
     type_counts = defaultdict(int)
@@ -559,14 +828,15 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
         "total": 0,
         "load": 0,
         "transfer": 0,
-        "redeem": 0
+        "redeem": 0,
+        "split": 0,
+        "merge": 0,
+        "issue": 0
     })
     cross_type_op = defaultdict(lambda: defaultdict(int))
     cross_op_type = defaultdict(lambda: defaultdict(int))
     cross_type_error = defaultdict(lambda: defaultdict(int))
     cross_op_error = defaultdict(lambda: defaultdict(int))
-    processing_time_by_inputs = defaultdict(list)
-    processing_time_by_outputs = defaultdict(list)
     merged_tokens = {}
     merged_transaction_amount_intervals = defaultdict(lambda: {
     "total": 0,
@@ -611,6 +881,11 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
                 merged_transaction_amount_intervals[interval]["load"] += x.get("load", 0)
                 merged_transaction_amount_intervals[interval]["transfer"] += x.get("transfer", 0)
                 merged_transaction_amount_intervals[interval]["redeem"] += x.get("redeem", 0)
+                
+                merged_transaction_amount_intervals[interval]["split"] += x.get("split", 0)    
+                merged_transaction_amount_intervals[interval]["merge"] += x.get("merge", 0)    
+                merged_transaction_amount_intervals[interval]["issue"] += x.get("issue", 0)         
+
         # Aggregate cross-type operation counts
         for t, op_dict in summary.get("crossTypeOp", {}).items():
             for op, count in op_dict.items():
@@ -659,17 +934,8 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
     merged_token_list = list(merged_tokens.values())
     temporal = get_temporal(daily_collection, start_date, end_date)
     aggregate_transaction_stats=calculate_aggregate_statistics(daily_collection, start_date, end_date)
-    merged_transaction_amounts_intervals = [{"index": key, **value} for key, value in merged_transaction_amount_intervals.items()]
-
-
-
-
-
-
-
-
-
-
+    merged_transaction_amount_intervals = [{"interval": key, **value} for key, value in merged_transaction_amount_intervals.items()]
+    bubble_data = aggregate_bubble_data(start_date, end_date, daily_collection)
             
     # Calculate overall success rate and average processing time
     success_rate = (total_success / total_transactions) * 100 if total_transactions else 0
@@ -689,13 +955,11 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
         "crossTypeOp": cross_type_op,
         "crossOpType": cross_op_type,
         "crossTypeError": cross_type_error,
-        "crossOpError": cross_op_error,                
-        "processingTimeByInputs": processing_time_by_inputs,
-        "processingTimeByOutputs": processing_time_by_outputs,
+        "crossOpError": cross_op_error,
         "duplicateTokens": merged_token_list,
         "temporal": temporal,
-        **aggregate_transaction_stats
-    
+        **aggregate_transaction_stats,
+        **bubble_data
     }
 
     return summary_doc

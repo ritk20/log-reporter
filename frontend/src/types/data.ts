@@ -1,4 +1,4 @@
-import type { TransactionType, OperationType, ErrorCode, TransactionResult } from './enums';
+import type { TransactionType, OperationType, ErrorCode, TransactionResult, MongoDate } from './enums';
 //TODO: Change the data to match the summary data from the backend analytics
 export type Tx = {
   Transaction_Id: string
@@ -99,17 +99,19 @@ export interface TransactionStats {
 export interface DuplicateToken {
   tokenId: string;
   count: number;
-  firstSeen?: string;
-  lastSeen?: string;
-  totalAmount?: number;
-  uniqueSenderOrgs?: number;
-  uniqueReceiverOrgs?: number;
+  firstSeen: MongoDate;
+  lastSeen: MongoDate;
+  totalAmount: number;
+  uniqueSenderOrgs: number;
+  uniqueReceiverOrgs: number;
   occurrences: Array<{
     Transaction_Id: string;
+    serialNo: string;
     senderOrg: string;
     receiverOrg: string;
-    amount: number;
-    timestamp: string;
+    amount: string;
+    currency: string;
+    timestamp: MongoDate;
   }>;
 }
 
@@ -117,11 +119,11 @@ export interface AggEntry {
   date?: string; // "YYYY-MM-DD"
   interval_start?: string;
   interval_end?: string;
-  count: number;
-  sum_amount: number;
+  byCount: Record<string, number>;
+  byAmount: Record<string, number>;
   byType?: Record<string, number>;
   byOp?:   Record<string, number>;
-  byErr?:  Record<string, number>;
+  // byErr?:  Record<string, number>;
 }
 
 export type TxSummary = {
@@ -131,9 +133,11 @@ export type TxSummary = {
   minProcessingTime: number
   maxProcessingTime: number
   averageONUSTransactionAmount: number
+  ONUSTotalAmount: number
   minONUSTransactionAmount: number
   maxONUSTransactionAmount: number
   averageOFFUSTransactionAmount: number
+  OFFUSTotalAmount: number
   minOFFUSTransactionAmount: number
   maxOFFUSTransactionAmount: number
   operation: Record<Tx['operation'], number> //all operation types (redundant)
@@ -148,4 +152,35 @@ export type TxSummary = {
   duplicateTokens: DuplicateToken[]
   temporal?: AggEntry[]
   transactionStatsByhourInterval?: AggEntry[]
+  performanceStatistics: {
+    avgProcessingTime: number;
+    maxProcessingTime: number;
+    minProcessingTime: number;
+    avgInputs: number;
+    maxInputs: number;
+    avgOutputs: number;
+    maxOutputs: number;
+    totalUniqueInputCounts: number;
+    totalUniqueOutputCounts: number;
+    mostFrequentInputCount: number;
+    mostFrequentOutputCount: number;
+  }
+  inputsBubble: {
+    x: number;
+    y: number;
+    size: number;
+    frequency: number;
+    avgProcessingTime: number;
+    minProcessingTime: number;
+    maxProcessingTime: number;
+  }[]
+  outputsBubble: {
+    x: number;
+    y: number;
+    size: number;
+    frequency: number;
+    avgProcessingTime: number;
+    minProcessingTime: number;
+    maxProcessingTime: number;
+  }[]
 }

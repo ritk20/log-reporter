@@ -37,7 +37,7 @@ export function Header() {
       const fetchLatestDate = async () => {
         try {
           const token = localStorage.getItem("authToken");
-          const res = await fetch("http://localhost:8000/analytics/latest-date", {
+          const res = await fetch("http://localhost:8000/analytics/latest-date?token_type=access", {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json'

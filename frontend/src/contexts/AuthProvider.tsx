@@ -14,7 +14,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Token validation function
   const validateToken = useCallback((): boolean => {
     const token = localStorage.getItem('authToken');
     
@@ -29,10 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentTime = Date.now() / 1000;
 
       if (decoded.exp < currentTime) {
-        return false; // Token expired
+        return false;
       }
       
-      // Ensure user object matches User type
       setUser({
         email: decoded.sub,
         role: decoded.role
@@ -44,7 +42,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Refresh token function
   const refreshAccessToken = useCallback(async (): Promise<string | null> => {
     try {
       const response = await fetch('http://localhost:8000/api/auth/refresh', {
@@ -68,9 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const checkAuth = async () => {
       setIsLoading(true);
       
-      // First try to validate existing token
       if (!validateToken()) {
-        // If token is invalid/expired, try to refresh
         const newToken = await refreshAccessToken();
         if (newToken) {
           validateToken();
@@ -84,8 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     checkAuth();
-    
-    // Check token every 5 minutes
+
     const interval = setInterval(checkAuth, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [validateToken, refreshAccessToken]);
@@ -120,7 +114,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = (): void => {
+  const logout = async (): Promise<void> => {
+    await fetch('http://localhost:8000/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    });
+
     localStorage.removeItem('authToken');
     setUser(null);
   };
