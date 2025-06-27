@@ -507,7 +507,7 @@ def aggregate_daily_summary(collection, daily_collection):
             "error": dict(error_counts),
             "errorDocs": error_docs,  
             "result": dict(result_counts),
-            "sumAmount":sum_amount,
+            # "sumAmount":sum_amount,
             "mergedTransactionAmountIntervals": bucket_docs,
             "total": total_transactions,
             "successRate": success_rate * 100,
@@ -611,7 +611,7 @@ def calculate_aggregate_statistics(daily_collection: Collection, start_date: str
         "OFFUSTotalAmount": 0.0
     }
     
-    counttotal = 0
+    count_total = 0
     processing_time = 0
     onusamt = 0
     offusamt = 0
@@ -949,7 +949,7 @@ def aggregate_summary_by_date_range(daily_collection: Collection, start_date: st
         "error": dict(error_counts),
         # "errorDocs": error_docs,
         "result": dict(result_counts),
-        "mergedTransactionAmountIntervals": merged_transaction_amounts_intervals, 
+        "mergedTransactionAmountIntervals": merged_transaction_amount_intervals, 
         "total": total_transactions,
         "successRate": success_rate,
         "crossTypeOp": cross_type_op,

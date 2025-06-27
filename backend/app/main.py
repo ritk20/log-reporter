@@ -8,7 +8,6 @@ from app.database.database import connect_to_mongo, close_mongo_connection
 from app.api.analytics import router as analytics_router
 from app.api.temporal import router as temporal_router
 from app.api.search import router as search_router
-from app.api.duplicates import router as duplicate_router
 from app.api.custom_query import router as custom_router
 from dotenv import load_dotenv
 from app.database.database import get_collection
@@ -48,7 +47,6 @@ app.include_router(upload_router)
 app.include_router(analytics_router)
 app.include_router(temporal_router)
 app.include_router(search_router)
-app.include_router(duplicate_router)
 app.include_router(custom_router)
 
 @app.get("/health")

@@ -105,6 +105,12 @@ def initialize_collections():
             background=True,
             name="serialNo_unique"
         )
+        # mongodb.token_coll.create_index(
+        #     [("occurrences.serialNo", 1)],
+        #     unique=False,
+        #     background=True,
+        #     name="serialNo_unique"
+        # )
 
         # Create the 'tokenId' index if it doesn't already exist
         if 'tokenId_unique_string' not in existing_indexes:

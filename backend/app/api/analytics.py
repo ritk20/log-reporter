@@ -70,6 +70,7 @@ async def get_latest_date(auth : dict = Depends(verify_token)):
 async def get_analytics(
     date: str = Query(..., description="YYYY-MM-DD, 'all', or a date range in the form 'YYYY-MM-DD:YYYY-MM-DD'"),
     auth: dict = Depends(verify_token)
+    
 ):
     """Get analytics data for a specific date or date range"""
     try:
@@ -86,17 +87,25 @@ async def get_analytics(
 
         # Handle date range
         if ":" in date:
+            
             start_date, end_date = date.split(":")
+            
             try:
+                
                 start_dt = datetime.strptime(start_date, "%Y-%m-%d")
                 end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+                
+                result = aggregate_summary_by_date_range(daily_collection, start_dt, end_dt)
+                print(f"wow{end_date}")
+                return parse_json(result)
+
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
             
-            result = aggregate_summary_by_date_range(daily_collection, start_dt, end_dt)
-            return parse_json(result)
+            
 
         # Handle single date
+        print(f"wow {date}")
         doc = daily_collection.find_one(
             {"date": date},
             {"_id": 0, "summary": 1}
