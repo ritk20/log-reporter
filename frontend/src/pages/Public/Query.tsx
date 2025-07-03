@@ -25,7 +25,7 @@ interface FilterState {
   outputsFilter: NumericFilter;
 }
 
-const TransactionFilters: React.FC = () => {
+export default function TransactionFilters() {
    const [filters, setFilters] = useState<FilterState>({
     startDate: '',
     endDate: '',
@@ -48,7 +48,7 @@ const TransactionFilters: React.FC = () => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [pagination, setPagination] = useState({
     page: 1,
-    pageSize: 10,
+    pageSize: 2,
     total: 0,
     totalPages: 0
   });
@@ -64,13 +64,9 @@ const TransactionFilters: React.FC = () => {
     { value: 'lte', label: 'Less than or equal' }
   ];
 
-  const fetchFilteredData = async (exportFormat?: string) => {
+  const fetchFilteredData = async ( page: number, exportFormat?: string) => {
     setLoading(true);
-    
-    // Reset pagination to page 1 for new searches (except for CSV export)
-    const isNewSearch = !exportFormat && !hasSearched;
-    const currentPage = exportFormat ? pagination.page : isNewSearch ? 1 : pagination.page;
-
+    setHasSearched(true);
     try {
       const params = new URLSearchParams();
       
@@ -99,8 +95,7 @@ const TransactionFilters: React.FC = () => {
         params.append('outputs_filter', `${filters.outputsFilter.operator}:${filters.outputsFilter.value}`);
       }
       
-      // Add pagination - use currentPage for regular searches, reset for new searches
-      params.append('page', currentPage.toString());
+      params.append('page', page.toString());
       params.append('page_size', pagination.pageSize.toString());
       
       if (exportFormat) {
@@ -158,7 +153,7 @@ const TransactionFilters: React.FC = () => {
   };
 
   const handleCsvDownload = async () => {
-    await fetchFilteredData('csv');
+    await fetchFilteredData(1, 'csv');
   };
 
   const handleFilterChange = (field: string, value: string) => {
@@ -459,7 +454,7 @@ const TransactionFilters: React.FC = () => {
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-4 mb-6">
         <button
-          onClick={() => fetchFilteredData()}
+          onClick={() => fetchFilteredData(1)}
           disabled={loading}
           className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
         >
@@ -632,17 +627,13 @@ const TransactionFilters: React.FC = () => {
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
-                    setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }));
-                  }}
+                  onClick={() => fetchFilteredData(pagination.page - 1)}
                   disabled={pagination.page === 1}
                 >
                   Previous
                 </button>
                 <button
-                  onClick={() => {
-                    setPagination(prev => ({ ...prev, page: Math.min(pagination.totalPages, prev.page + 1) }));
-                  }}
+                  onClick={() => fetchFilteredData(pagination.page + 1)}
                   disabled={pagination.page === pagination.totalPages}
                 >
                   Next
@@ -655,5 +646,3 @@ const TransactionFilters: React.FC = () => {
     </div>
   );
 };
-
-export default TransactionFilters;
