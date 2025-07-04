@@ -64,21 +64,23 @@ export default function Upload() {
 
       const xhr = new XMLHttpRequest();
 
-      xhr.open('POST', 'http://localhost:8000/api/upload/upload', true);
+      xhr.open('POST', 'http://backend:8000/api/upload/upload', true);
       xhr.withCredentials = true;
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
       xhr.upload.addEventListener('progress', (e) => {
         if (!e.lengthComputable) return;
         const pct = Math.round((e.loaded / e.total) * 100);
-        setTask((prev) => ({
-          ...prev,
+        setTask({
+          taskId: task?.taskId ?? "uploading",
+          status: task?.status ?? "uploading",
+          error: task?.error ?? null,
           progress: {
             current: pct,
             total: 100,
             message: `Uploading… ${pct}%`
           }
-        }));
+        });
       });
 
       xhr.onreadystatechange = () => {

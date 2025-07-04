@@ -13,6 +13,7 @@ import numpy as np
 from typing import Any
 import json
 from bson import json_util
+from app.utils.performance_monitor import performance_monitor
 
 def convert_numpy_types(obj: Any) -> Any:
     if isinstance(obj, np.generic):
