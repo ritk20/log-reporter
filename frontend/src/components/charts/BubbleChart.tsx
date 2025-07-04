@@ -54,15 +54,23 @@ export default function PerformanceBubbleChart({
     const frequencies = data.map(d => d.frequency);
     const minFrequency = Math.min(...frequencies);
     const maxFrequency = Math.max(...frequencies);
-    
-    // Scale bubble sizes proportionally (min 10px, max 60px)
-    const bubbleData = data.map(point => ({
-      ...point,
-      scaledSize: 10 + ((point.frequency - minFrequency) / (maxFrequency - minFrequency)) * 50
-    }));
 
-    return {
-      bubbleData,
+    const bubbleData = data.map(point => {
+      let scaledSize;
+      if (minFrequency === maxFrequency) {
+        scaledSize = 30;
+      } else {
+        scaledSize = 10 + ((point.frequency - minFrequency) / (maxFrequency - minFrequency)) * 50;
+      }
+      
+      return {
+        ...point,
+        scaledSize
+      };
+    });
+
+    return { 
+      bubbleData, 
       frequencyRange: [minFrequency, maxFrequency]
     };
   }, [data]);
@@ -113,28 +121,28 @@ export default function PerformanceBubbleChart({
         borderWidth: 1,
         textStyle: { color: '#374151' }
       },
-      
       xAxis: {
         type: 'value',
         name: xAxisLabel,
         nameLocation: 'middle',
         nameGap: 30,
-        min: function(value: { min: number; max: number }) {
-          return Math.max(0, value.min - 0.5);
-        },
-        max: function(value: { min: number; max: number }) {
-          return value.max + 0.5;
-        },
         interval: 1,
         axisLabel: {
-          formatter: (value: number) => Math.round(value).toString()
+          formatter: (value: number) => Math.round(value).toString(),
+          interval: 0
         },
+        
         splitLine: {
           show: true,
           lineStyle: {
+            width: 1,
             color: '#F3F4F6',
             type: 'dashed'
           }
+        },
+        axisTick: {
+          interval: 0,
+          alignWithLabel: true
         }
       },
       
@@ -146,6 +154,12 @@ export default function PerformanceBubbleChart({
         axisLabel: {
           formatter: (value: number) => `${(value * 1000).toFixed(0)}ms`
         },
+        min: function(value: { min: number; max: number }) {
+          return Math.max(0, Math.floor(value.min) - 0.1);
+        },
+        max: function(value: { min: number; max: number }) {
+          return Math.ceil(value.max) + 0.1;
+        },
         splitLine: {
           show: true,
           lineStyle: {
@@ -154,23 +168,6 @@ export default function PerformanceBubbleChart({
           }
         }
       },
-      
-      visualMap: {
-        min: frequencyRange[0],
-        max: frequencyRange[1],
-        dimension: 'frequency',
-        inRange: {
-          color: colors.gradient
-        },
-        text: ['High Frequency', 'Low Frequency'],
-        left: 'right',
-        top: 'center',
-        textStyle: {
-          color: '#6B7280',
-          fontSize: 12
-        }
-      },
-      
       series: [{
         name: 'Performance Bubbles',
         type: 'scatter',
@@ -188,7 +185,10 @@ export default function PerformanceBubbleChart({
         })),
         symbolSize: function(data: [number, number, number]) {
           const frequency = data[2];
-          const normalizedSize = (frequency - frequencyRange[0]) / (frequencyRange[1] - frequencyRange[0]);
+          let normalizedSize = (frequency - frequencyRange[0]) / (frequencyRange[1] - frequencyRange[0]);
+          if( frequencyRange[0] === frequencyRange[1] ) {
+            normalizedSize = 0.5; // Default size if all frequencies are the same
+          }
           return 15 + normalizedSize * 45; // Min 15px, max 60px
         },
         emphasis: {
