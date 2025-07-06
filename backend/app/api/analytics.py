@@ -1,6 +1,6 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Query # type: ignore
-from pymongo import MongoClient # type: ignore
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pymongo import MongoClient
 from app.core.config import settings
 from app.api.analytics_service import aggregate_daily_summary, aggregate_summary_by_date_range
 from datetime import datetime, timedelta
@@ -98,7 +98,8 @@ async def get_analytics(
             raise HTTPException(status_code=404, detail=f"No data found for {date}")
         
         return parse_json(doc["summary"])
-
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

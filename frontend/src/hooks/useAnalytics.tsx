@@ -60,14 +60,15 @@ export function useAnalytics(queryParams: QueryParams) {
           }
         );
         console.log("response", response)
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
+        
         if(response.status === 404) {
           setData(null);
           setIsLoading(false);
           return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const jsonData = await response.json();
