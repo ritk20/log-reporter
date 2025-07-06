@@ -272,7 +272,7 @@ export default function AnalyticsPage() {
   }
 
   if (!data) {
-    return <div className="text-center p-4">No data available</div>;
+    return <div className="text-center p-4 text-red-500">No data available</div>;
   }
 
   const handleDownloadPDF = () => {
