@@ -1,8 +1,8 @@
 
 from typing import List, Dict, Any
 from pymongo.errors import BulkWriteError
-from pymongo import UpdateOne
-from app.database.database import get_collection, get_tokens_collection, get_temp_collection, get_temptoken_collection
+from pymongo import InsertOne
+from app.database.database import get_collection, get_duplicates_collection, get_tokens_collection, get_temp_collection, get_temptoken_collection
 from datetime import datetime, timezone
 import logging
 import pandas as pd
@@ -87,6 +87,7 @@ class LogStorageService:
     
         collection = get_collection()
         tokens_collection = get_tokens_collection()
+        duplicates_collection = get_duplicates_collection()
         temp_collection = get_temp_collection()
         temptoken_collection = get_temptoken_collection()
 
@@ -106,17 +107,11 @@ class LogStorageService:
             return {"inserted": 0, "errors": 0, "tokens_inserted": 0, "tokens_updated": 0}
 
         tokens = []
-        tokenIds = []
-        logs_to_insert = []
+        logs_to_insert = [] #actual master db
 
         try:
-            bulk_operations = []    #actual master db
-            duplicate_tokens = []   #Track duplicates locally
-
             # Initialize results
             logs_inserted_count = 0
-            tokens_upserted_count = 0
-            tokens_modified_count = 0
             token_write_errors = []
 
             process_raw_logs_start = time.perf_counter()
@@ -155,34 +150,24 @@ class LogStorageService:
                 if log_entry.get('Result_of_Transaction') == 1:
                     for input_token in log_entry.get('Inputs', []):
                         token_id = input_token.get("id")
-                        
                         if token_id:
-                            existing_token = tokens_collection.find_one({"tokenId": token_id})
-                            if existing_token:
-                                tokenIds.append(token_id)
-                            
-                            token_occurrence = {
-                            "amount": input_token.get("value", "NA"),
-                            "currency": input_token.get("currency", "NA"),
-                            "serialNo": input_token.get("serialNo", "NA"),
-                            "timestamp": log_entry['Request_timestamp'],
-                            "senderOrg": log_entry.get('SenderOrgId'),
-                            "receiverOrg": log_entry.get('ReceiverOrgId'),
-                            "Transaction_Id": log_entry['Transaction_Id'],
-                            "Msg_id": log_entry['Msg_id'],
-                            "_processed_at": log_entry['_processed_at'],
-                            "_version": 1
+                            # Create individual token document
+                            token_doc = {
+                                "tokenId": token_id,
+                                "amount": input_token.get("value", "NA"),
+                                "currency": input_token.get("currency", "NA"),
+                                "serialNo": input_token.get("serialNo", "NA"),
+                                "timestamp": log_entry['Request_timestamp'],
+                                "senderOrg": log_entry.get('SenderOrgId'),
+                                "receiverOrg": log_entry.get('ReceiverOrgId'),
+                                "transactionId": log_entry['Transaction_Id'],
+                                "msgId": log_entry['Msg_id'],
+                                "_processed_at": log_entry['_processed_at'],
+                                "_version": 1
                             }
-                            tokens.append(
-                                UpdateOne(
-                                    {"tokenId": input_token.get("id")},
-                                    {
-                                        "$setOnInsert": {"tokenId": input_token.get("id")},
-                                        "$push": {"occurrences": token_occurrence}
-                                    },
-                                    upsert=True
-                                )
-                            )
+                            
+                            # Use InsertOne operation for cleaner duplicate handling
+                            tokens.append(InsertOne(token_doc))
             process_raw_logs_time = time.perf_counter() - process_raw_logs_start
             print(f"Process raw logs: {process_raw_logs_time:.6f} seconds")
 
@@ -204,60 +189,81 @@ class LogStorageService:
 
             # Bulk write tokens (tokens collection)
             update_progress(85, 100, "Processing tokens...")
+            tokens_inserted_count = 0
+            tokens_updated_count = 0
+            duplicates_inserted_count = 0
             tokens_insert_start = time.perf_counter()
             if tokens:
-                token_result = tokens_collection.bulk_write(tokens, ordered=False)
-                tokens_upserted_count = token_result.upserted_count
-                tokens_modified_count = token_result.modified_count
-                token_write_errors = token_result.bulk_api_result.get('writeErrors', [])
-                logger.info(f"Tokens bulk write: upserted={tokens_upserted_count}, modified={tokens_modified_count}, errors={len(token_write_errors)}")
+                try:
+                    token_result = tokens_collection.bulk_write(tokens, ordered=False)
+                    tokens_inserted_count = token_result.upserted_count
+                    tokens_updated_count = token_result.modified_count
+                    logger.info(f"Tokens bulk write: upserted={tokens_inserted_count}, modified={tokens_updated_count}")
+                    
+                except BulkWriteError as e:
+                    # Handle bulk write errors
+                    token_write_errors = e.details.get('writeErrors', [])
+                    tokens_inserted_count = e.details.get('nUpserted', 0)
+                    tokens_updated_count = e.details.get('nModified', 0)
+                    
+                    # Process duplicate key errors
+                    duplicate_docs = []
+                    for error in token_write_errors:
+                        if error.get('code') == 11000:  # Duplicate key error
+                            # Extract the document that caused the duplicate
+                            token_data = error['op']
+                            
+                            # Create duplicate document
+                            duplicate_doc = {
+                                "tokenId": token_data.get('tokenId'),
+                                "amount": token_data.get('amount'),
+                                "currency": token_data.get('currency'),
+                                "serialNo": token_data.get('serialNo'),
+                                "timestamp": token_data.get('timestamp'),
+                                "senderOrg": token_data.get('senderOrg'),
+                                "receiverOrg": token_data.get('receiverOrg'),
+                                "transactionId": token_data.get('Transaction_Id'),
+                                "msgId": token_data.get('Msg_id'),
+                                "duplicateCount": 1,
+                                "firstSeen": token_data.get('timestamp'),
+                                "lastSeen": token_data.get('timestamp'),
+                                "_processed_at": token_data.get('_processed_at'),
+                                "_version": 1
+                            }
+                            duplicate_docs.append(duplicate_doc)
+                        else:
+                            # Log other types of errors
+                            logger.warning(f"Non-duplicate error in token processing: {error}")
+                    
+                    # Insert duplicates into separate collection
+                    if duplicate_docs:
+                        try:
+                            duplicates_result = duplicates_collection.insert_many(duplicate_docs, ordered=False)
+                            duplicates_inserted_count = len(duplicates_result.inserted_ids)
+                            logger.info(f"Inserted {duplicates_inserted_count} duplicate tokens")
+                        except Exception as duplicate_error:
+                            logger.error(f"Error inserting duplicates: {str(duplicate_error)}")
+                    
+                    logger.info(f"Processed {len(token_write_errors)} token write errors")
+            
             else:
                 logger.info("No token operations to perform.")
             tokens_insert_time = time.perf_counter() - tokens_insert_start
             print(f"Tokens insert: {tokens_insert_time:.6f} seconds")
-
-            update_progress(95, 100, "Finalizing...")
-            find_duplicates_start = time.perf_counter()
-            for id in tokenIds:
-                # Find existing token to collect duplicate info
-                existing_token = tokens_collection.find_one({"tokenId": id})
-                if existing_token:
-                    duplicate_tokens.append({
-                        "tokenId": existing_token.get("tokenId"),
-                        "firstSeen": existing_token.get("occurrences", [{}])[0].get("timestamp") if existing_token.get("occurrences") else None,
-                        "lastSeen": existing_token.get("occurrences", [{}])[-1].get("timestamp") if existing_token.get("occurrences") else None,
-                        "count": len(existing_token.get("occurrences", [])),
-                        "uniqueSenderOrgs": len(set(o.get("senderOrg") for o in existing_token.get("occurrences", []) if o.get("senderOrg"))),
-                        "uniqueReceiverOrgs": len(set(o.get("receiverOrg") for o in existing_token.get("occurrences", []) if o.get("receiverOrg"))),
-                        "totalAmount": sum(float(o.get("amount", 0)) for o in existing_token.get("occurrences", [])),
-                        "occurrences": existing_token.get("occurrences", [])
-                    })
-            find_duplicates_time = time.perf_counter() - find_duplicates_start
-            print(f"Find duplicates: {find_duplicates_time:.6f} seconds")
-
-            insert_temptoken_start = time.perf_counter()
-            if duplicate_tokens:
-                temptoken_collection.insert_many(duplicate_tokens)
-                logger.info(f"Inserted {len(duplicate_tokens)} duplicate token entries into temporary collection.")
-            insert_temptoken_time = time.perf_counter() - insert_temptoken_start
-            print(f"Insert temp tokens: {insert_temptoken_time:.6f} seconds")
 
             update_progress(100, 100, "Storage completed successfully!")
             total_time = time.perf_counter() - start_time
             print(f"Total processing time: {total_time:.6f} seconds")
 
             return {
-                # "inserted": result.inserted_count,
-                # "updated": result.modified_count,
-                # "matched": result.matched_count,
                 "errors": 0,
-                "total_processed": len(bulk_operations),
-                "tokens_inserted": token_result.upserted_count if tokens else 0,
-                "tokens_updated": token_result.modified_count if tokens else 0,
-                "token_errors": token_result.bulk_api_result.get('writeErrors', []),
-                "token_matched": token_result.matched_count if tokens else 0,
+                "total_processed": len(logs_to_insert),
+                "tokens_inserted": tokens_inserted_count,
+                "tokens_updated": tokens_updated_count,
+                "duplicates_inserted": duplicates_inserted_count,
+                "token_errors": len([e for e in token_write_errors if e.get('code') != 11000]),
+                "duplicate_tokens": duplicates_inserted_count,
                 "token_total_processed": len(tokens) if tokens else 0,
-                "duplicate_tokens": duplicate_tokens
             }
 
         except BulkWriteError as e:
@@ -268,7 +274,7 @@ class LogStorageService:
                 "errors": len(e.details.get('writeErrors', [])),
                 "error_details": e.details,
                 "total_logs_processed": len(parsed_logs),
-                "tokens_upserted": 0, # Cannot determine precise counts for tokens in this block
+                "tokens_upserted": 0,
                 "tokens_modified": 0,
                 "total_tokens_operations": len(tokens),
                 "token_write_errors": []

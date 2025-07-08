@@ -14,6 +14,7 @@ class MongoDB:
     temptoken_coll = None
     daily_summary = None
     overall_summary = None
+    duplicates_coll = None
 
 mongodb = MongoDB()
 
@@ -47,10 +48,12 @@ async def connect_to_mongo():
         temptoken_coll = database[settings.MONGODB_TEMP_TOKENS_COLLECTION_NAME]
         daily_collection = database[settings.MONGODB_DAILY_SUMM_COLLECTION_NAME]
         overall_collection = database[settings.MONGODB_SUMM_COLLECTION_NAME]
+        duplicates_coll = database[settings.MONGODB_DUPLICATE_COLLECTION_NAME]
 
         mongodb.token_coll = token_coll
         mongodb.temp_coll = temp_coll
         mongodb.temptoken_coll = temptoken_coll
+        mongodb.duplicates_coll = duplicates_coll
         mongodb.daily_summary = daily_collection
         mongodb.overall_summary = overall_collection
 
@@ -101,18 +104,10 @@ def initialize_collections():
             [("tokenId", 1)],
             unique=True,
             background=True,
-            partialFilterExpression={"tokenId": {"$type": "string"}}
+            name="unique_tokenId_index"
         )
-        mongodb.token_coll.create_index({"occurrences.serialNo": 1})
-        mongodb.token_coll.create_index({
-            "occurrences.serialNo": "text",
-            "tokenId": "text"
-        })
-        mongodb.token_coll.create_index({
-            "occurrences.timestamp": -1,
-            "tokenId": 1,
-            "occurrences.serialNo": 1
-        })
+        mongodb.duplicates_coll.create_index({"tokenId": 1})
+        mongodb.duplicates_coll.create_index({"timestamp": -1})
 
         logger.info("MongoDB indexes created successfully")
 
@@ -156,6 +151,12 @@ def get_temp_collection():
         logger.error("MongoDB temp collection not initialized")
         raise RuntimeError("Database connection not established")
     return mongodb.temp_coll
+
+def get_duplicates_collection():
+    if mongodb.duplicates_coll is None:
+        logger.error("MongoDB duplicates collection not initialized")
+        raise RuntimeError("Database connection not established")
+    return mongodb.duplicates_coll
 
 def get_database_client():
     if mongodb.client is None:

@@ -670,7 +670,7 @@ export default function AnalyticsPage() {
             <h3 className="text-lg font-semibold text-gray-900">Duplicate Tokens Analysis</h3>
           </div>
           <div className="p-6">
-            <DuplicateTokensTable data={data.duplicateTokens} total={data.total}/>
+            <DuplicateTokensTable dateFilter={queryParams.date}/>
           </div>
         </div>
 
