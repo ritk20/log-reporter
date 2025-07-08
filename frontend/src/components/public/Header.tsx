@@ -83,7 +83,7 @@ export function Header() {
 
   const getStatusMessage = () => {
     if (task.progress) {
-      return task.progress.message || `${task.progress.current}/${task.progress.total}`;
+      return task.progress.message || 'Processing...';
     }
     return task.status === 'idle' ? 'No active tasks' : task.status;
   };
@@ -140,7 +140,7 @@ export function Header() {
                           </button>
                         )}
                       </div>
-                      {task.progress && task.status !== 'completed' && (
+                      {task.progress?.current && task.progress?.total && task.status !== 'completed' && (
                         <div className="mt-2">
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div

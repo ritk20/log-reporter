@@ -14,7 +14,6 @@ class MongoDB:
     temptoken_coll = None
     daily_summary = None
     overall_summary = None
-    refresh_token_coll = None  # NEW
 
 mongodb = MongoDB()
 
@@ -120,12 +119,6 @@ def initialize_collections():
     except Exception as e:
         logger.error(f"Collection initialization failed: {str(e)}")
         raise
-
-def get_refresh_token_collection():
-    if mongodb.refresh_token_coll is None:
-        logger.error("MongoDB refresh token collection not initialized")
-        raise RuntimeError("Database connection not established")
-    return mongodb.refresh_token_coll
 
 def get_collection():
     if mongodb.collection is None:

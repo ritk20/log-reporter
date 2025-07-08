@@ -67,8 +67,23 @@ class LogStorageService:
 
     @performance_monitor
     @staticmethod
-    def store_logs_batch(parsed_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def store_logs_batch(parsed_logs: List[Dict[str, Any]], task_id: str = "") -> Dict[str, Any]:
         start_time = time.perf_counter()
+
+        from app.services.task_manager import update_task
+        total_logs = len(parsed_logs)
+        
+        # Update progress helper function
+        def update_progress(current: int, total: int, message: str):
+            if task_id:
+                progress_data = {
+                    "progress": {
+                        "current": current,
+                        "total": total,
+                        "message": message
+                    }
+                }
+                update_task(task_id, progress_data)
     
         collection = get_collection()
         tokens_collection = get_tokens_collection()
@@ -95,9 +110,8 @@ class LogStorageService:
         logs_to_insert = []
 
         try:
-            # Initialize variables for bulk operations
             bulk_operations = []    #actual master db
-            duplicate_tokens = []  # Track duplicates locally
+            duplicate_tokens = []   #Track duplicates locally
 
             # Initialize results
             logs_inserted_count = 0
@@ -106,10 +120,13 @@ class LogStorageService:
             token_write_errors = []
 
             process_raw_logs_start = time.perf_counter()
-            for raw_entry in parsed_logs:
+            for i, raw_entry in enumerate(parsed_logs):
                 if not raw_entry.get('Msg_id'):
                     logger.warning("Log entry missing Msg_id, skipping")
                     continue
+                if i % 100 == 0 or i in [total_logs//4, total_logs//2, 3*total_logs//4]:
+                    progress_percent = int((i / total_logs) * 70)
+                    update_progress(progress_percent, 100, f"Processing logs... {i}/{total_logs}")
                 log_entry = raw_entry
                 
                 if log_entry['Request_timestamp'] is None:
@@ -170,6 +187,7 @@ class LogStorageService:
             print(f"Process raw logs: {process_raw_logs_time:.6f} seconds")
 
             # Insert logs
+            update_progress(75, 100, "Storing logs in database...")
             logs_insert_start = time.perf_counter()
             if logs_to_insert:
                 result = collection.insert_many(logs_to_insert, ordered=False)
@@ -185,6 +203,7 @@ class LogStorageService:
             
 
             # Bulk write tokens (tokens collection)
+            update_progress(85, 100, "Processing tokens...")
             tokens_insert_start = time.perf_counter()
             if tokens:
                 token_result = tokens_collection.bulk_write(tokens, ordered=False)
@@ -197,6 +216,7 @@ class LogStorageService:
             tokens_insert_time = time.perf_counter() - tokens_insert_start
             print(f"Tokens insert: {tokens_insert_time:.6f} seconds")
 
+            update_progress(95, 100, "Finalizing...")
             find_duplicates_start = time.perf_counter()
             for id in tokenIds:
                 # Find existing token to collect duplicate info
@@ -221,6 +241,8 @@ class LogStorageService:
                 logger.info(f"Inserted {len(duplicate_tokens)} duplicate token entries into temporary collection.")
             insert_temptoken_time = time.perf_counter() - insert_temptoken_start
             print(f"Insert temp tokens: {insert_temptoken_time:.6f} seconds")
+
+            update_progress(100, 100, "Storage completed successfully!")
             total_time = time.perf_counter() - start_time
             print(f"Total processing time: {total_time:.6f} seconds")
 
