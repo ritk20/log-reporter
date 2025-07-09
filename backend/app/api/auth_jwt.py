@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 import uuid
 from app.core.config import settings
+import logging
 
 # JWT Configuration
 SECRET_KEY = settings.SECRET_KEY
@@ -47,6 +48,7 @@ def verify_token(token: str = Depends(oauth2_scheme), token_type: str = "access"
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != token_type:
             raise credentials_exception
+        logging.info(f"Token verified: {payload}")
         return {
             "username": payload.get("sub"),
             "roles": [payload.get("role")],

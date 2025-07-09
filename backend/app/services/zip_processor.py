@@ -72,24 +72,21 @@ def process_zip_file(task_id: str, file_path: str, user_info: dict):
         logger.info("Starting logs to dataframe conversion")
         if all_parsed_logs:
             update_task(task_id, {
-                "status": "processing_records",
-                "progress": {"current": 0, "total": len(all_parsed_logs)}
+                "status": "processing_records"
             })
             df = combine_logs(all_parsed_logs)
             records = df.to_dict("records")
 
             logger.info("Storing data in mongodb")
             update_task(task_id, {
-                "status": "storing_data",
-                "progress": {"current": 0, "total": len(records)}
+                "status": "storing_data"
             })
-            info = LogStorageService.store_logs_batch(records)
+            info = LogStorageService.store_logs_batch(records, task_id)
             df.to_json(f"{file_path}_{task_id}_output.json", orient="records")
 
             logger.info("Starting Analysis")
             update_task(task_id, {
-                "status": "Analysing data",
-                "progress": "Slow"
+                "status": "Analysing data"
             })
             generate_summary_report()
 
