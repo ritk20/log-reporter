@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useTask } from '../../hooks/useTask';
-import type { TaskInfo } from '../../contexts/TaskContext';
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -47,14 +46,14 @@ export default function Upload() {
       xhr.upload.addEventListener('progress', (e) => {
         if (!e.lengthComputable) return;
         const pct = Math.round((e.loaded / e.total) * 100);
-        setTask(((prev: TaskInfo) => ({
+        setTask((prev) => ({
           ...prev,
           progress: {
             current: pct,
             total: 100,
             message: `Uploading… ${pct}%`
           }
-        })) as unknown as TaskInfo);    //quick fix for type error, will need to update your provider to accept updater functions in future
+        }));
       });
 
       xhr.onreadystatechange = () => {

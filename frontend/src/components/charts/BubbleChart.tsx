@@ -52,8 +52,11 @@ export default function PerformanceBubbleChart({
     if (!data || data.length === 0) return { bubbleData: [], frequencyRange: [0, 1] };
 
     const frequencies = data.map(d => d.frequency);
+    const yValues = data.map(d => d.y);
     const minFrequency = Math.min(...frequencies);
     const maxFrequency = Math.max(...frequencies);
+    const minY = Math.min(...yValues);
+    const maxY = Math.max(...yValues);
 
     const bubbleData = data.map(point => {
       let scaledSize;
@@ -71,12 +74,13 @@ export default function PerformanceBubbleChart({
 
     return { 
       bubbleData, 
-      frequencyRange: [minFrequency, maxFrequency]
+      frequencyRange: [minFrequency, maxFrequency],
+      yRange: [minY, maxY]
     };
   }, [data]);
 
   const getChartOption = () => {
-    const { bubbleData, frequencyRange } = processedData;
+    const { bubbleData, frequencyRange, yRange } = processedData;
 
     return {
       animation: true,
