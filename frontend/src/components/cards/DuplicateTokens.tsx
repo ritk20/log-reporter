@@ -1,13 +1,54 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import type { DuplicateToken } from '../../types/data';
+import { LoadingSpinner } from '../public/Loading';
+
+const useDuplicates = (dateFilter: string) => {
+  const [data, setData] = useState<DuplicateToken[]>([]);
+  const [isLoading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDuplicates = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem("authToken");
+        const response = await fetch(
+          `${import.meta.env.VITE_API_BASE}/duplicates/duplicates?date=${dateFilter}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        setData(result.duplicates);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch duplicates');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDuplicates();
+  }, [dateFilter]);
+
+  return { data, isLoading, error };
+};
 
 interface DuplicateTokensTableProps {
-  data: DuplicateToken[];
-  total: number;
+  dateFilter: string;
 }
 
-export default function DuplicateTokensTable({ data, total }: DuplicateTokensTableProps) {
+export default function DuplicateTokensTable({ dateFilter }: DuplicateTokensTableProps) {
+  const {data, isLoading, error} = useDuplicates(dateFilter)
+
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [sortBy, setSortBy] = useState<'count' | 'amount' | 'firstSeen' | 'lastSeen'>('count');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -58,6 +99,20 @@ export default function DuplicateTokensTable({ data, total }: DuplicateTokensTab
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = sortedData.slice(startIndex, startIndex + itemsPerPage);
 
+  if (isLoading) {
+    return (
+      <LoadingSpinner/>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-red-600 text-center py-8">
+        Error loading duplicates: {error}
+      </div>
+    );
+  }
+
   if (!data || data.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 text-center">
@@ -80,7 +135,7 @@ export default function DuplicateTokensTable({ data, total }: DuplicateTokensTab
           <div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Duplicate Token Analysis</h3>
             <p className="text-gray-600">
-              Found {data.length} tokens with duplicates across {total} transactions
+              Found {data.length} tokens with duplicates
             </p>
           </div>
           

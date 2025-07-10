@@ -10,6 +10,7 @@ from app.api.temporal import router as temporal_router
 from app.api.search import router as search_router
 from app.api.duplicates import router as duplicate_router
 from app.api.custom_query import router as custom_router
+from app.api.duplicates import router as duplicates_router
 from dotenv import load_dotenv
 from app.database.database import get_collection
 from app.middleware.auth import JWTMiddleware
@@ -50,6 +51,8 @@ app.include_router(temporal_router)
 app.include_router(search_router)
 app.include_router(duplicate_router)
 app.include_router(custom_router)
+app.include_router(duplicates_router)
+
 
 @app.get("/health")
 async def health_check():

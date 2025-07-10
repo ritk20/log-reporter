@@ -148,18 +148,24 @@ export default function Upload() {
         <div className="w-full max-w-sm bg-white rounded-xl shadow-md p-6 mb-6">
           <div className="flex items-center justify-center mb-4">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-            <span className="text-lg font-semibold text-gray-700">Processing...</span>
+            <span className="text-lg font-semibold text-gray-700">
+              {task?.status === 'uploading' ? 'Uploading...' : 'Processing...'}
+            </span>
           </div>
           <div className="flex justify-between text-sm text-gray-600 mb-3">
             <span className="font-medium">{task.progress.message}</span>
-            <span className="font-bold text-blue-600">{task.progress.current}%</span>
+            {task.progress.current !== undefined && task.progress.total !== undefined &&
+              <span className="font-bold text-blue-600">{task.progress.current}%</span>
+            }
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-            <div
-              className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500 ease-out shadow-sm"
-              style={{ width: `${task.progress.current}%` }}
-            ></div>
-          </div>
+          {task.progress.current && task.progress.total &&
+            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500 ease-out shadow-sm"
+                style={{ width: `${task.progress.current}%` }}
+              ></div>
+            </div>
+          }
           <div className="mt-3 text-xs text-gray-500 text-center">
             Please wait while we process your file...
           </div>

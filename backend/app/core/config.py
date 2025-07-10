@@ -38,6 +38,7 @@ class Settings:
     MONGODB_TEMP_TOKENS_COLLECTION_NAME: str = os.getenv("MONGODB_TEMP_TOKENS_COLLECTION_NAME", "tempTokens2")
     MONGODB_TEMP_COLLECTION_NAME: str = os.getenv("MONGODB_TEMP_COLLECTION_NAME","Temp2")
     MONGODB_REFRESH_TOKEN_NAME:str=os.getenv("MONGODB_REFRESH_TOKEN_NAME","Refresh_Token")
+    MONGODB_DUPLICATE_COLLECTION_NAME: str = os.getenv("MONGODB_DUPLICATE_COLLECTION_NAME", "duplicate_tokens2")
 
     #JWT
     SECRET_KEY: str = os.getenv("SECRET_KEY","VerySecret")
