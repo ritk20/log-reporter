@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
+from app.database.database import get_temptoken_collection
 from pymongo.collection import Collection
 from bson import json_util
 import json
@@ -482,6 +483,9 @@ def aggregate_daily_summary(collection, daily_collection):
     start_time_iso = min_time_val.isoformat() if hasattr(min_time_val, "isoformat") else str(min_time_val)
     end_time_iso = max_time_val.isoformat() if hasattr(max_time_val, "isoformat") else str(max_time_val)
 
+    temp_token_coll = get_temptoken_collection()
+    duplicate_tokens = list(temp_token_coll.find({}, {'_id': 0}))
+
     summary_doc = {
         "date": start_time_iso[:10],
         "start_time": start_time_iso,
@@ -505,6 +509,7 @@ def aggregate_daily_summary(collection, daily_collection):
             "processingTimeByInputs": processing_time_by_inputs,
             "processingTimeByOutputs": processing_time_by_outputs,
             "transactionStatsByhourInterval": interval_stats,
+            "duplicateTokens": duplicate_tokens,
             **transaction_stats,
             **processing_time_stats
         }

@@ -5,6 +5,7 @@ import re
 from datetime import datetime, timedelta
 from app.api.auth_jwt import verify_token
 from app.core.config import settings
+from app.database.database import get_collection
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
@@ -23,6 +24,7 @@ async def search_tokens(
 ):
     """Search tokens by tokenId with expanded occurrences."""
     try:
+        pipeline = []
         match_stage = {}
 
         # Date filtering
@@ -31,7 +33,7 @@ async def search_tokens(
                 filter_date = datetime.strptime(date_filter, "%Y-%m-%d")
                 start_date = filter_date.replace(tzinfo=None)
                 end_date = (filter_date + timedelta(days=1)).replace(tzinfo=None)
-                match_stage["timestamp"] = {"$gte": start_date, "$lt": end_date}
+                match_stage["occurrences.timestamp"] = {"$gte": start_date, "$lt": end_date}
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
@@ -39,96 +41,54 @@ async def search_tokens(
         token_regex = re.compile(f"^{re.escape(query)}", re.IGNORECASE)
         match_stage["tokenId"] = {"$regex": token_regex}
 
-        pipeline = [
-            {"$match": match_stage},
-            {
-                "$project": {
-                    "_id": 0,
-                    "tokenId": 1,
-                    "serialNo": 1,
-                    "amount": 1,
-                    "currency": 1,
-                    "timestamp": 1,
-                    "senderOrg": 1,
-                    "receiverOrg": 1,
-                    "transactionId": 1,
-                    "msgId": 1,
-                    "duplicateCount": {"$ifNull": ["$duplicateCount", 0]},
-                    "isDuplicate": {"$literal": False}
-                }
-            },
-            {
-                "$unionWith": {
-                    "coll": settings.MONGODB_DUPLICATE_COLLECTION_NAME,
-                    "pipeline": [
-                        {"$match": match_stage},
-                        {
-                            "$project": {
-                                "_id": 0,
-                                "tokenId": 1,
-                                "serialNo": 1,
-                                "amount": 1,
-                                "currency": 1,
-                                "timestamp": 1,
-                                "senderOrg": 1,
-                                "receiverOrg": 1,
-                                "transactionId": 1,
-                                "msgId": 1,
-                                "duplicateCount": {"$ifNull": ["$duplicateCount", 1]},
-                                "isDuplicate": {"$literal": True}
-                            }
-                        }
-                    ]
-                }
-            },
-            {"$sort": {"timestamp": -1}}
-        ]
-        
+        pipeline.append({"$match": match_stage})
+
+        # Unwind occurrences
+        pipeline.append({"$unwind": "$occurrences"})
+
+        # Re-apply date filter post-unwind
+        if date_filter and date_filter != "all":
+            pipeline.append({"$match": {"occurrences.timestamp": {"$gte": start_date, "$lt": end_date}}})
+
         # Count total results
         count_pipeline = pipeline + [{"$count": "total"}]
         total_result = list(tokens_collection.aggregate(count_pipeline))
         total = total_result[0]["total"] if total_result else 0
-        
-        # Add pagination
+
+        # Sorting and pagination
         pipeline.extend([
+            {"$sort": {"occurrences.timestamp": -1}},
             {"$skip": (page - 1) * limit},
             {"$limit": limit}
         ])
-        
+
         # Execute search
         results = list(tokens_collection.aggregate(pipeline))
-        
+
         # Format results
-        processed_results = []
-        for doc in results:
-            processed_results.append({
-                "tokenId": doc.get("tokenId"),
-                "serialNo": doc.get("serialNo"),
-                "amount": doc.get("amount"),
-                "currency": doc.get("currency"),
-                "timestamp": doc.get("timestamp"),
-                "senderOrg": doc.get("senderOrg"),
-                "receiverOrg": doc.get("receiverOrg"),
-                "transactionId": doc.get("transactionId"),
-                "msgId": doc.get("msgId"),
-                "duplicateCount": doc.get("duplicateCount", 0),
-                "isDuplicate": doc.get("isDuplicate", False),
-                "source": "duplicate" if doc.get("isDuplicate") else "original"
-            })
-        
+        processed_results = [
+            {
+                "tokenId": doc["tokenId"],
+                "serialNo": doc["occurrences"].get("serialNo"),
+                "amount": doc["occurrences"].get("amount"),
+                "currency": doc["occurrences"].get("currency"),
+                "timestamp": doc["occurrences"].get("timestamp"),
+                "senderOrg": doc["occurrences"].get("senderOrg"),
+                "receiverOrg": doc["occurrences"].get("receiverOrg"),
+                "transactionId": doc["occurrences"].get("Transaction_Id"),
+                "msgId": doc["occurrences"].get("Msg_id")
+            }
+            for doc in results
+        ]
+
         return {
             "results": {
                 "token": processed_results
             },
-            "pagination": {
-                "page": page,
-                "limit": limit,
-                "total": total,
-                "pages": (total + limit - 1) // limit
-            },
+            "pagination": {"page": page, "limit": limit, "total": total, "pages": (total + limit - 1) // limit},
             "query": query
         }
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Token search failed: {str(e)}")
 
@@ -140,6 +100,7 @@ async def search_serial_numbers(
     date_filter: Optional[str] = Query(None, description="Date filter (YYYY-MM-DD or 'all')"),
     auth: dict = Depends(verify_token)
 ):
+    """Search by serial number within occurrences."""
     try:
         pipeline = []
         match_stage = {}
@@ -150,99 +111,60 @@ async def search_serial_numbers(
                 filter_date = datetime.strptime(date_filter, "%Y-%m-%d")
                 start_date = filter_date.replace(tzinfo=None)
                 end_date = (filter_date + timedelta(days=1)).replace(tzinfo=None)
-                match_stage["timestamp"] = {"$gte": start_date, "$lt": end_date}
+                match_stage["occurrences.timestamp"] = {"$gte": start_date, "$lt": end_date}
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
         # Serial number search
         serial_regex = re.compile(f"^{re.escape(query)}", re.IGNORECASE)
-        match_stage["serialNo"] = {"$regex": serial_regex}
+        match_stage["occurrences.serialNo"] = {"$regex": serial_regex}
 
-        pipeline = [
+        pipeline.extend([
             {"$match": match_stage},
-            {
-                "$project": {
-                    "_id": 0,
-                    "tokenId": 1,
-                    "serialNo": 1,
-                    "amount": 1,
-                    "currency": 1,
-                    "timestamp": 1,
-                    "senderOrg": 1,
-                    "receiverOrg": 1,
-                    "transactionId": 1,
-                    "msgId": 1,
-                    "duplicateCount": {"$ifNull": ["$duplicateCount", 0]},
-                    "isDuplicate": {"$literal": False}
-                }
-            },
-            {
-                "$unionWith": {
-                    "coll": settings.MONGODB_DUPLICATE_COLLECTION_NAME,
-                    "pipeline": [
-                        {"$match": match_stage},
-                        {
-                            "$project": {
-                                "_id": 0,
-                                "tokenId": 1,
-                                "serialNo": 1,
-                                "amount": 1,
-                                "currency": 1,
-                                "timestamp": 1,
-                                "senderOrg": 1,
-                                "receiverOrg": 1,
-                                "transactionId": 1,
-                                "msgId": 1,
-                                "duplicateCount": {"$ifNull": ["$duplicateCount", 1]},
-                                "isDuplicate": {"$literal": True}
-                            }
-                        }
-                    ]
-                }
-            },
-            {"$sort": {"timestamp": -1}}
-        ]
-        
-        # Count and paginate (same logic as token search)
+            {"$unwind": "$occurrences"},
+            {"$match": {"occurrences.serialNo": {"$regex": serial_regex}}}
+        ])
+
+        # Re-apply date filter post-unwind
+        if date_filter and date_filter != "all":
+            pipeline.append({"$match": {"occurrences.timestamp": {"$gte": start_date, "$lt": end_date}}})
+
+        # Count total results
         count_pipeline = pipeline + [{"$count": "total"}]
         total_result = list(tokens_collection.aggregate(count_pipeline))
         total = total_result[0]["total"] if total_result else 0
-        
+
+        # Sorting and pagination
         pipeline.extend([
+            {"$sort": {"occurrences.timestamp": -1}},
             {"$skip": (page - 1) * limit},
             {"$limit": limit}
         ])
-        
+
+        # Execute search
         results = list(tokens_collection.aggregate(pipeline))
-        
-        # Format results (same as token search)
-        processed_results = []
-        for doc in results:
-            processed_results.append({
-                "tokenId": doc.get("tokenId"),
-                "serialNo": doc.get("serialNo"),
-                "amount": doc.get("amount"),
-                "currency": doc.get("currency"),
-                "timestamp": doc.get("timestamp"),
-                "senderOrg": doc.get("senderOrg"),
-                "receiverOrg": doc.get("receiverOrg"),
-                "transactionId": doc.get("transactionId"),
-                "msgId": doc.get("msgId"),
-                "duplicateCount": doc.get("duplicateCount", 0),
-                "isDuplicate": doc.get("isDuplicate", False),
-                "source": "duplicate" if doc.get("isDuplicate") else "original"
-            })
-        
+
+        # Format results
+        processed_results = [
+            {
+                "tokenId": doc["tokenId"],
+                "serialNo": doc["occurrences"].get("serialNo"),
+                "amount": doc["occurrences"].get("amount"),
+                "currency": doc["occurrences"].get("currency"),
+                "timestamp": doc["occurrences"].get("timestamp"),
+                "senderOrg": doc["occurrences"].get("senderOrg"),
+                "receiverOrg": doc["occurrences"].get("receiverOrg"),
+                "transactionId": doc["occurrences"].get("Transaction_Id"),
+                "msgId": doc["occurrences"].get("Msg_id")
+            }
+            for doc in results
+        ]
+
         return {
             "results": {
                 "token": processed_results
             },
-            "pagination": {
-                "page": page,
-                "limit": limit,
-                "total": total,
-                "pages": (total + limit - 1) // limit
-            },
+            "pagination": {"page": page, "limit": limit, "total": total, "pages": (total + limit - 1) // limit},
             "query": query
         }
 

@@ -59,7 +59,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           error: data.error || null,
           progress: data.progress || null
         };
-        console.log("task status:", updatedTask);
+
         setTask(updatedTask);
 
         if (data.status === "completed" || data.status === "failed") {

@@ -48,7 +48,7 @@ export default function TransactionFilters() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [pagination, setPagination] = useState({
     page: 1,
-    pageSize: 10,
+    pageSize: 2,
     total: 0,
     totalPages: 0
   });

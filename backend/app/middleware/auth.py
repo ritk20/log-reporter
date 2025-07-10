@@ -1,4 +1,4 @@
-from fastapi import Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from jose import JWTError, jwt
@@ -17,10 +17,7 @@ class JWTMiddleware(BaseHTTPMiddleware):
             "/api/auth/refresh",
             "/api/auth/logout",
             "/docs",
-            "/openapi.json",
-            "/health",
-            "/sample",
-            "/mongo-health"
+            "/openapi.json"
         ]
         if any(request.url.path.startswith(path) for path in skip_paths):
             return await call_next(request)

@@ -34,15 +34,11 @@ def authenticate_user(username: str, password: str):
         print("[ERROR] Password not set.")
         return None
     db_password = user_data["password"]
-    try:
-        if bcrypt.checkpw(password.encode('utf-8'), db_password.encode('utf-8')):
-            print("[SUCCESS] Authenticated.")
-            return {"email": username, "role": user_data.get("role", "user")}
-        else:
-            print("[ERROR] Incorrect password.")
-            return None
-    except ValueError as e:
-        print(f"[ERROR] bcrypt error: {e}")
+    if bcrypt.checkpw(password.encode('utf-8'), db_password.encode('utf-8')):
+        print("[SUCCESS] Authenticated.")
+        return {"email": username, "role": user_data.get("role", "user")}
+    else:
+        print("[ERROR] Incorrect password.")
         return None
 
 # Login route

@@ -76,12 +76,10 @@ def check_task_status(task_id: str, current_user: dict = Depends(verify_token)):
             "authenticated": True,
             "user": current_user.get('username')
         }
-    
-    logger.info(task.get("status",""))
+
     return {
         "task_id": task_id,
         "status": task.get("status"),
-        "progress": task.get("progress", {}),
         "requested_by": current_user.get('username'),
         "task_owner": task.get("user"),
         "is_owner": current_user.get('username') == task.get("user"),

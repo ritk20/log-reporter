@@ -555,7 +555,7 @@ export default function AnalyticsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Success Rate</p>
-                    <p className="text-3xl font-bold text-green-600">{data.successRate.toFixed(2)}%</p>
+                    <p className="text-3xl font-bold text-green-600">{data.successRate}%</p>
                     <p className="text-sm text-gray-500 mt-1">
                       {data.successRate >= 95 ? 'Excellent' : data.successRate >= 90 ? 'Good' : 'Needs attention'}
                     </p>
@@ -670,7 +670,7 @@ export default function AnalyticsPage() {
             <h3 className="text-lg font-semibold text-gray-900">Duplicate Tokens Analysis</h3>
           </div>
           <div className="p-6">
-            <DuplicateTokensTable dateFilter={queryParams.date}/>
+            <DuplicateTokensTable data={data.duplicateTokens} total={data.total}/>
           </div>
         </div>
 

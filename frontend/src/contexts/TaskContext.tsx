@@ -2,8 +2,8 @@
 import { createContext } from "react";
 
 export interface TaskProgress {
-  current?: number;
-  total?: number;
+  current: number;
+  total: number;
   message?: string;
 }
 
