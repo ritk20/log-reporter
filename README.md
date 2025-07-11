@@ -1,6 +1,7 @@
-🚀 Full Stack Web App - FastAPI, MongoDB, React (Vite)
-This is a full-stack web application built using:
+# Logs Reporter
+This is a full-stack web application to display analytics of log files 
 
+# 🚀 Technology Stack
 - Frontend: React with Vite  
 - Backend: FastAPI (Python)  
 - Database: MongoDB
@@ -11,7 +12,8 @@ This is a full-stack web application built using:
 project-root/
 │
 ├── backend/              # FastAPI app
-│   ├── main.py
+│   ├── app/
+│   │   ├── main.py
 │   └── requirements.txt
 │
 ├── frontend/             # React + Vite app
@@ -36,7 +38,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 #### 🌐 Frontend Setup (React + Vite)
@@ -56,11 +58,9 @@ Create a `.env` file in the root directory based on this template.
 > Ensure `.env` file is set properly, refer to `env.txt` for changes
 
 Run the following command from the project root:
-
-bash
-
-`docker-compose up --build -d`
-
+```
+docker-compose up --build -d
+```
 access frontend at `https://localhost:3000`
 
 access backend at `https://localhost:8000`
@@ -79,8 +79,9 @@ After setting up your GCP VM and transferring the project files:
 
 - Run the following command:
 
-`docker-compose up --build -d`
-
+```
+docker-compose up --build -d
+```
 access frontend at `http://34.100.235.138:5044`
 
 access backend at `http://34.100.235.138:5044/backend`
