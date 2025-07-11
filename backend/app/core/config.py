@@ -11,10 +11,10 @@ class Settings:
 
     # CORS settings
     ALL_CORS_ORIGINS: List[str] = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "http://localhost:27017"
+        os.getenv("BACKEND_URL"),
+        os.getenv("FRONTEND_URL"),
+        os.getenv("MONGODB_URL" ) 
+        
     ]
 
     # Upload directory
